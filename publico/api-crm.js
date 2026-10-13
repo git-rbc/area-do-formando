@@ -502,13 +502,17 @@
     }
 
     // ── meus dados ───────────────────────────────────────────────────────────
-    // Leitura montada de /me; mudar contato e lembrete ainda não existe no CRM,
-    // e a tela esconde o que não vier.
+    // O CRM devolve tudo o que a tela precisa, inclusive `lembreteDias`: com
+    // quanta antecedência ele é avisado do vencimento hoje (mig 1053). Quem
+    // nunca escolheu recebe o padrão da casa, e o CRM já responde com ele.
     if (caminho === '/perfil') {
-      const r = await pedir('GET', '/perfil', null, token);
-      // `lembrete` (avisar N dias antes do vencimento) ainda não existe no CRM:
-      // depende de onde guardar a preferência e de quem dispara o aviso.
-      return { ...r, lembrete: null };
+      return pedir('GET', '/perfil', null, token);
+    }
+
+    // A escolha de quando ser lembrado: 1, 3, 5 ou 7 dias antes, ou `null`,
+    // que o CRM grava como "não quero".
+    if (caminho === '/perfil/lembrete' && metodo === 'POST') {
+      return pedir('POST', '/perfil/lembrete', corpo || {}, token);
     }
 
     if (caminho === '/perfil/contato' && (metodo === 'POST' || metodo === 'PATCH')) {
@@ -614,7 +618,13 @@
     informeIr: true,
     // O sino avisa fatura em aberto e resposta a pedido (decisão de 29/09).
     notificacoes: true,
-    // Lembrete de vencimento: falta onde guardar a preferência e quem dispara.
+    // Lembrete de vencimento: o job já existe e a preferência de cada um tem
+    // onde morar (mig 1053, aplicada em 09/10), mas a ROTA que grava a escolha
+    // está só na dev. Ligar isto antes de ela chegar em produção põe no ar um
+    // botão que morre em erro. Vira `true` no dia do deploy do dev→master.
+    //
+    // No protótipo e na demonstração a seção continua aparecendo: lá não existe
+    // `API_RECURSOS`, e é assim que dá para testar a tela antes do deploy.
     lembrete: false,
     // Confirmar presença e convites nomeados: sem lugar no CRM para cadastrar.
     presenca: false,

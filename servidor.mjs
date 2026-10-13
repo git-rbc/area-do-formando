@@ -39,7 +39,8 @@ const comprovantes = [];        // { id, adesaoId, billId, arquivo, tipo, tamanh
 let sequencialUnico = 0;        // numeração dos boletos únicos de antecipação
 const unicosPorId = new Map();  // id -> boleto único, para a parcela saber se o dela expirou
 const historicos = new Map();   // billId -> [{ quando, o_que, detalhe }] — o que já aconteceu com a parcela
-const lembretes = new Map();    // adesaoId -> dias de antecedência do aviso de vencimento
+const lembretes = new Map();    // adesaoId -> dias de antecedência (0 = pediu para não receber)
+const LEMBRETE_PADRAO_DIAS = 3; // o mesmo padrão do CRM, para quem nunca escolheu
 const presencas = new Map();    // adesaoId -> { [chaveEtapa]: 'sim' | 'nao' }
 const lidas = new Map();        // adesaoId -> Set de ids de notificação já vistas
 
@@ -999,7 +1000,12 @@ async function api(req, res, url) {
       curso: adesao.curso,
       turma: turma.rotulo,
       pendente,
-      lembreteDias: lembretes.get(adesao.adesaoId) ?? null,
+      // Os mesmos três estados do CRM (mig 1053): quem nunca escolheu recebe o
+      // padrão da casa, quem escolheu recebe o dele, e quem desligou fica em 0.
+      lembreteDias: lembretes.has(adesao.adesaoId)
+        ? (lembretes.get(adesao.adesaoId) || null)
+        : LEMBRETE_PADRAO_DIAS,
+      lembreteEscolhido: lembretes.has(adesao.adesaoId),
     });
   }
 
@@ -1008,8 +1014,10 @@ async function api(req, res, url) {
     const adesao = exigirFormando(req, res); if (!adesao) return;
     const { dias } = await lerCorpo(req);
     if (dias === null || dias === 0) {
-      lembretes.delete(adesao.adesaoId);
-      return responder(res, 200, { lembreteDias: null });
+      // 0 é "não quero", e precisa ficar gravado: apagar faria o formando
+      // voltar ao padrão e receber de novo o aviso que ele desligou.
+      lembretes.set(adesao.adesaoId, 0);
+      return responder(res, 200, { lembreteDias: null, lembreteEscolhido: true });
     }
     const n = Number(dias);
     if (![1, 3, 5, 7].includes(n)) return responder(res, 400, { erro: 'prazo_invalido' });

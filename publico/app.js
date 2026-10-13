@@ -2434,6 +2434,24 @@ async function telaMeusDados(erro) {
            <button class="link-inline" id="editar-endereco">Informar agora</button>.</div>
          </div>`}
 
+    ${temRecurso('lembrete') ? `
+    <div class="secao-titulo">Lembrete de vencimento</div>
+    <p class="rodape-nota" style="margin:0 0 12px">
+      ${p.lembreteDias
+        // recebe: ou porque escolheu, ou porque vale o padrão da casa
+        ? `Hoje você recebe o aviso <b>${p.lembreteDias} dia${p.lembreteDias > 1 ? 's' : ''} antes</b> de cada vencimento, por e-mail.${p.lembreteEscolhido ? '' : ' É o padrão — dá para mudar aqui.'}`
+        // A tela não oferece desligar: o aviso de vencimento faz parte do
+        // acompanhamento da parcela. Quem pedir à equipe fica com 0 no
+        // cadastro, e é este o caso que cai aqui — pode religar escolhendo.
+        : 'O aviso de vencimento está desligado no seu cadastro. Para voltar a recebê-lo, escolha quando.'}
+    </p>
+    <div class="filtros" id="lembretes">
+      ${[1, 3, 5, 7].map((d) => `<button data-lembrete="${d}" class="${p.lembreteDias === d ? 'ativo' : ''}">${d} dia${d > 1 ? 's' : ''} antes</button>`).join('')}
+    </div>
+    <div class="acoes" style="margin:12px 0 4px">
+      <button class="botao secundario" id="salvar-lembrete" disabled>Salvar</button>
+    </div>` : ''}
+
     <div class="secao-titulo">Contato</div>
     <form id="form-contato" novalidate>
       <div class="campo">
@@ -2451,28 +2469,43 @@ async function telaMeusDados(erro) {
         <button class="botao secundario" type="button" data-fechar-folha>Fechar</button>
       </div>
     </form>
-    <div class="secao-titulo">Lembrete de vencimento</div>
-    <p class="rodape-nota" style="margin:0 0 12px">
-      ${p.lembreteDias
-        ? `Hoje você recebe o aviso <b>${p.lembreteDias} dia${p.lembreteDias > 1 ? 's' : ''} antes</b> de cada vencimento, por e-mail.`
-        : 'Quer um aviso antes de cada parcela vencer? Escolha quando, e ele chega por e-mail.'}
-    </p>
-    <div class="filtros" id="lembretes">
-      ${[1, 3, 5, 7].map((d) => `<button data-lembrete="${d}" class="${p.lembreteDias === d ? 'ativo' : ''}">${d} dia${d > 1 ? 's' : ''} antes</button>`).join('')}
-      ${p.lembreteDias ? '<button data-lembrete="0">Não quero</button>' : ''}
-    </div>
-
     <p class="rodape-nota">A mudança de contato é conferida pela equipe antes de valer — assim
     ninguém troca o contato de outra pessoa por engano.</p>
   `, (el) => {
-    el.querySelectorAll('[data-lembrete]').forEach((b) => b.addEventListener('click', async () => {
-      const dias = Number(b.dataset.lembrete);
-      try {
-        await chamar('/perfil/lembrete', { method: 'POST', body: JSON.stringify({ dias: dias || null }) });
-        avisar(dias ? `Combinado: aviso ${dias} dia${dias > 1 ? 's' : ''} antes` : 'Lembrete desligado');
-        telaMeusDados();
-      } catch { avisar('Não foi possível registrar agora'); }
-    }));
+    // ESCOLHER E SALVAR SÃO DOIS PASSOS. O clique só marca; nada vai para o
+    // servidor antes do Salvar — assim um toque errado na lista não muda, em
+    // silêncio, quando a pessoa é avisada do vencimento.
+    const salvarLembrete = el.querySelector('#salvar-lembrete');
+    if (salvarLembrete) {
+      // O que está valendo hoje; se ele voltar para cá, não há o que salvar.
+      const atual = p.lembreteDias || 0;
+      let escolhido = atual;
+
+      const marcar = () => {
+        el.querySelectorAll('[data-lembrete]').forEach((b) =>
+          b.classList.toggle('ativo', Number(b.dataset.lembrete) === escolhido));
+        salvarLembrete.disabled = escolhido === atual;
+      };
+
+      el.querySelectorAll('[data-lembrete]').forEach((b) => b.addEventListener('click', () => {
+        escolhido = Number(b.dataset.lembrete);
+        marcar();
+      }));
+
+      salvarLembrete.addEventListener('click', async () => {
+        if (escolhido === atual) return;
+        salvarLembrete.disabled = true;
+        try {
+          await chamar('/perfil/lembrete', { method: 'POST', body: JSON.stringify({ dias: escolhido }) });
+          avisar(`Combinado: aviso ${escolhido} dia${escolhido > 1 ? 's' : ''} antes`);
+          telaMeusDados();
+        } catch {
+          // Devolve o botão: a escolha dele continua na tela, e dá para tentar de novo.
+          salvarLembrete.disabled = false;
+          avisar('Não foi possível salvar agora');
+        }
+      });
+    }
     el.querySelector('#editar-endereco')?.addEventListener('click', () => telaEndereco());
     const tel = el.querySelector('#telefone');
     tel.addEventListener('input', () => { tel.value = mascaraTelefone(tel.value); });
