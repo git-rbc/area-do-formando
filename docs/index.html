@@ -2526,13 +2526,17 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
     }
 
     // ── meus dados ───────────────────────────────────────────────────────────
-    // Leitura montada de /me; mudar contato e lembrete ainda não existe no CRM,
-    // e a tela esconde o que não vier.
+    // O CRM devolve tudo o que a tela precisa, inclusive `lembreteDias`: com
+    // quanta antecedência ele é avisado do vencimento hoje (mig 1053). Quem
+    // nunca escolheu recebe o padrão da casa, e o CRM já responde com ele.
     if (caminho === '/perfil') {
-      const r = await pedir('GET', '/perfil', null, token);
-      // `lembrete` (avisar N dias antes do vencimento) ainda não existe no CRM:
-      // depende de onde guardar a preferência e de quem dispara o aviso.
-      return { ...r, lembrete: null };
+      return pedir('GET', '/perfil', null, token);
+    }
+
+    // A escolha de quando ser lembrado: 1, 3, 5 ou 7 dias antes, ou `null`,
+    // que o CRM grava como "não quero".
+    if (caminho === '/perfil/lembrete' && metodo === 'POST') {
+      return pedir('POST', '/perfil/lembrete', corpo || {}, token);
     }
 
     if (caminho === '/perfil/contato' && (metodo === 'POST' || metodo === 'PATCH')) {
@@ -2626,6 +2630,10 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
     // operadora confirmou. Sai como comprovante, sem CNPJ, enquanto a equipe não
     // define qual empresa do grupo emite a cobrança da formatura.
     recibo: true,
+    // A lista de formandos da turma em PDF (09/10/2026): os nomes da tela
+    // separados por curso, com o telefone ao lado — este o CRM só põe no papel,
+    // a tela continua sem contato de colega.
+    listaDaTurmaPdf: true,
     // Ligado pela resposta de /config, que diz se há número de atendimento.
     falarComEquipe: false,
     // Informe de pagamentos do ano (05/10/2026). O CNPJ que faltava foi
@@ -2634,7 +2642,13 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
     informeIr: true,
     // O sino avisa fatura em aberto e resposta a pedido (decisão de 29/09).
     notificacoes: true,
-    // Lembrete de vencimento: falta onde guardar a preferência e quem dispara.
+    // Lembrete de vencimento: o job já existe e a preferência de cada um tem
+    // onde morar (mig 1053, aplicada em 09/10), mas a ROTA que grava a escolha
+    // está só na dev. Ligar isto antes de ela chegar em produção põe no ar um
+    // botão que morre em erro. Vira `true` no dia do deploy do dev→master.
+    //
+    // No protótipo e na demonstração a seção continua aparecendo: lá não existe
+    // `API_RECURSOS`, e é assim que dá para testar a tela antes do deploy.
     lembrete: false,
     // Confirmar presença e convites nomeados: sem lugar no CRM para cadastrar.
     presenca: false,
@@ -5082,6 +5096,24 @@ async function telaMeusDados(erro) {
            <button class="link-inline" id="editar-endereco">Informar agora</button>.</div>
          </div>`}
 
+    ${temRecurso('lembrete') ? `
+    <div class="secao-titulo">Lembrete de vencimento</div>
+    <p class="rodape-nota" style="margin:0 0 12px">
+      ${p.lembreteDias
+        // recebe: ou porque escolheu, ou porque vale o padrão da casa
+        ? `Hoje você recebe o aviso <b>${p.lembreteDias} dia${p.lembreteDias > 1 ? 's' : ''} antes</b> de cada vencimento, por e-mail.${p.lembreteEscolhido ? '' : ' É o padrão — dá para mudar aqui.'}`
+        // A tela não oferece desligar: o aviso de vencimento faz parte do
+        // acompanhamento da parcela. Quem pedir à equipe fica com 0 no
+        // cadastro, e é este o caso que cai aqui — pode religar escolhendo.
+        : 'O aviso de vencimento está desligado no seu cadastro. Para voltar a recebê-lo, escolha quando.'}
+    </p>
+    <div class="filtros" id="lembretes">
+      ${[1, 3, 5, 7].map((d) => `<button data-lembrete="${d}" class="${p.lembreteDias === d ? 'ativo' : ''}">${d} dia${d > 1 ? 's' : ''} antes</button>`).join('')}
+    </div>
+    <div class="acoes" style="margin:12px 0 4px">
+      <button class="botao secundario" id="salvar-lembrete" disabled>Salvar</button>
+    </div>` : ''}
+
     <div class="secao-titulo">Contato</div>
     <form id="form-contato" novalidate>
       <div class="campo">
@@ -5099,28 +5131,43 @@ async function telaMeusDados(erro) {
         <button class="botao secundario" type="button" data-fechar-folha>Fechar</button>
       </div>
     </form>
-    <div class="secao-titulo">Lembrete de vencimento</div>
-    <p class="rodape-nota" style="margin:0 0 12px">
-      ${p.lembreteDias
-        ? `Hoje você recebe o aviso <b>${p.lembreteDias} dia${p.lembreteDias > 1 ? 's' : ''} antes</b> de cada vencimento, por e-mail.`
-        : 'Quer um aviso antes de cada parcela vencer? Escolha quando, e ele chega por e-mail.'}
-    </p>
-    <div class="filtros" id="lembretes">
-      ${[1, 3, 5, 7].map((d) => `<button data-lembrete="${d}" class="${p.lembreteDias === d ? 'ativo' : ''}">${d} dia${d > 1 ? 's' : ''} antes</button>`).join('')}
-      ${p.lembreteDias ? '<button data-lembrete="0">Não quero</button>' : ''}
-    </div>
-
     <p class="rodape-nota">A mudança de contato é conferida pela equipe antes de valer — assim
     ninguém troca o contato de outra pessoa por engano.</p>
   `, (el) => {
-    el.querySelectorAll('[data-lembrete]').forEach((b) => b.addEventListener('click', async () => {
-      const dias = Number(b.dataset.lembrete);
-      try {
-        await chamar('/perfil/lembrete', { method: 'POST', body: JSON.stringify({ dias: dias || null }) });
-        avisar(dias ? `Combinado: aviso ${dias} dia${dias > 1 ? 's' : ''} antes` : 'Lembrete desligado');
-        telaMeusDados();
-      } catch { avisar('Não foi possível registrar agora'); }
-    }));
+    // ESCOLHER E SALVAR SÃO DOIS PASSOS. O clique só marca; nada vai para o
+    // servidor antes do Salvar — assim um toque errado na lista não muda, em
+    // silêncio, quando a pessoa é avisada do vencimento.
+    const salvarLembrete = el.querySelector('#salvar-lembrete');
+    if (salvarLembrete) {
+      // O que está valendo hoje; se ele voltar para cá, não há o que salvar.
+      const atual = p.lembreteDias || 0;
+      let escolhido = atual;
+
+      const marcar = () => {
+        el.querySelectorAll('[data-lembrete]').forEach((b) =>
+          b.classList.toggle('ativo', Number(b.dataset.lembrete) === escolhido));
+        salvarLembrete.disabled = escolhido === atual;
+      };
+
+      el.querySelectorAll('[data-lembrete]').forEach((b) => b.addEventListener('click', () => {
+        escolhido = Number(b.dataset.lembrete);
+        marcar();
+      }));
+
+      salvarLembrete.addEventListener('click', async () => {
+        if (escolhido === atual) return;
+        salvarLembrete.disabled = true;
+        try {
+          await chamar('/perfil/lembrete', { method: 'POST', body: JSON.stringify({ dias: escolhido }) });
+          avisar(`Combinado: aviso ${escolhido} dia${escolhido > 1 ? 's' : ''} antes`);
+          telaMeusDados();
+        } catch {
+          // Devolve o botão: a escolha dele continua na tela, e dá para tentar de novo.
+          salvarLembrete.disabled = false;
+          avisar('Não foi possível salvar agora');
+        }
+      });
+    }
     el.querySelector('#editar-endereco')?.addEventListener('click', () => telaEndereco());
     const tel = el.querySelector('#telefone');
     tel.addEventListener('input', () => { tel.value = mascaraTelefone(tel.value); });
@@ -5522,7 +5569,8 @@ function abaTurma() {
           </div>`).join('')}
       </div>
       <p class="rodape-nota" style="margin-top:10px">Quem aparece aqui assinou a adesão desta turma.
-      Nada do financeiro de ninguém é mostrado — nem o seu para os outros.</p>` : ''}
+      Nada do financeiro de ninguém é mostrado — nem o seu para os outros.</p>
+      ${temRecurso('listaDaTurmaPdf') ? '<div class="acoes"><button class="botao secundario" data-lista-pdf>Baixar a lista em PDF</button></div>' : ''}` : ''}
     ${t.pacote ? `<div class="cartao">
       <div class="kicker traco">Pacote contratado</div>
       <p style="margin:6px 0 0">${escapar(t.pacote)}</p>
@@ -5565,6 +5613,15 @@ function abaTurma() {
   `, escapar(t.rotulo));
 
   app.querySelectorAll('[data-ir]').forEach((b) => b.addEventListener('click', () => irPara(b.dataset.ir)));
+  // A lista em PDF sai do CRM (é lá que o navegador do servidor imprime a
+  // folha). No protótipo e na demonstração o botão continua aparecendo, dizendo
+  // o que faz no app de verdade — esconder faria o teste local parecer que a
+  // função não existe.
+  app.querySelectorAll('[data-lista-pdf]').forEach((b) => b.addEventListener('click', () => {
+    if (!window.API_CRM) return avisar('No app de verdade, este botão baixa a lista da turma em PDF');
+    const turma = (t.rotulo || 'formatura').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w]+/g, '-');
+    baixarArquivo('/turma/formandos/pdf', `formandos-turma-${turma}.pdf`);
+  }));
 }
 
 // ---------- central de avisos (o sino) ---------------------------------------
