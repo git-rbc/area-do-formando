@@ -2780,6 +2780,7 @@ function abaContrato() {
     </div>
 
     <div class="secao-titulo">Seus convites</div>
+    ${blocoDasCompras(c.compras)}
     <div class="cartao">
       ${c.convites.map((cv) => {
         const pct = cv.quantidade ? Math.min(100, (cv.nomeados || 0) / cv.quantidade * 100) : 0;
@@ -2789,12 +2790,24 @@ function abaContrato() {
               <span>${escapar(cv.tipo)}${cv.quantidade > cv.incluso ? ` <small>(${cv.incluso} no pacote + ${cv.quantidade - cv.incluso} extra)</small>` : ''}</span>
               <b>${cv.quantidade}${cv.valorUnitario ? ` · ${brl(cv.valorUnitario)}` : ' · incluso'}</b>
             </div>
-            <div class="convite-barra"><i style="width:${pct.toFixed(0)}%"></i></div>
-            <small>${cv.nomeados || 0} de ${cv.quantidade} com nome na lista${(cv.nomeados || 0) < cv.quantidade ? ' — faltam nomear' : ' ✓'}</small>
+            ${/* A barra é de convidados NOMEADOS, que só existe onde há lista
+                  de nomes. No CRM não há onde cadastrar isso, e aí a linha vem
+                  com `nomeados: null` — mostrar "0 de 3 nomeados" seria inventar
+                  uma pendência que o formando não tem como resolver. */ ''}
+            ${cv.nomeados == null ? '' : `
+              <div class="convite-barra"><i style="width:${pct.toFixed(0)}%"></i></div>
+              <small>${cv.nomeados} de ${cv.quantidade} com nome na lista${cv.nomeados < cv.quantidade ? ' — faltam nomear' : ' ✓'}</small>`}
           </div>`;
       }).join('')}
       <div class="acoes"><button class="botao secundario" id="pedir">Comprar convites extras</button></div>
     </div>
+
+    ${/* Festa que já passou do prazo de compra: fica aqui, fora da hora de
+          escolher, só para ele entender por que ela não aparece lá. */ ''}
+    ${(c.festasEncerradas || []).length ? `
+      <p class="rodape-nota">
+        Sem venda de convite agora: ${c.festasEncerradas.map((f) => `<b>${escapar(f.rotulo)}</b> (${escapar(f.motivo || 'indisponível')})`).join(' · ')}
+      </p>` : ''}
 
     ${(() => {
       // Aqui só cabem os pedidos que mexem no contrato; o resto mora em Meus pedidos.
@@ -2883,13 +2896,16 @@ function balaoPagamento(forma) {
 }
 
 /**
- * O ESTADO DE UMA COMPRA QUE FICOU NO MEIO (14/10/2026).
+ * COMO CADA ESTADO DE COMPRA SE CHAMA PARA O FORMANDO.
  *
- * O aditivo abre em aba nova. Quem fechava sem assinar ficava preso: só pode
- * haver uma compra aberta por vez, então não assinava nem comprava de novo — a
- * saída era ligar para a equipe. Agora a compra pendente aparece no topo da
- * tela, com o caminho de volta (assinar, ou pagar quando foi no cartão) e a
- * opção de desistir enquanto não assinou.
+ * Isto mora na tela de CONTRATO, não na de comprar (pedido do Dani, 14/10): a
+ * hora de escolher convite deve falar só da compra que ele está fazendo. O que
+ * ele já tem, o que falta assinar e o que já passou ficam no Contrato, junto
+ * com os documentos.
+ *
+ * Não existe desistir: depois de pedir, ele segue com o aditivo. Por isso a
+ * tela de compra precisa dizer com todas as letras o que ele está levando e
+ * quanto vai pagar ANTES de confirmar.
  */
 const ESTADO_COMPRA = {
   aguardando_assinatura: { rotulo: 'Falta a sua assinatura', classe: 'alerta' },
@@ -2898,6 +2914,7 @@ const ESTADO_COMPRA = {
   falhou: { rotulo: 'Deu problema — a equipe já está vendo', classe: 'alerta' },
 };
 
+/** O que o formando já tem e o que ficou pendente — desenhado na aba Contrato. */
 function blocoDasCompras(historico) {
   const vivas = (historico || []).filter((c) => c.status !== 'cancelado');
   if (!vivas.length) return '';
@@ -2910,28 +2927,23 @@ function blocoDasCompras(historico) {
 
   return `
     ${pendente ? `
-      <div class="faixa ${(ESTADO_COMPRA[pendente.status] || {}).classe || ''}" style="margin-bottom:12px"><div>
+      <div class="faixa ${(ESTADO_COMPRA[pendente.status] || {}).classe || ''}"><div>
         <b>${escapar((ESTADO_COMPRA[pendente.status] || {}).rotulo || 'Compra em andamento')}</b>
         <br>${escapar(linhaItens(pendente))} · ${brl(Number(pendente.valor_total || 0))}
         ${pendente.retomarUrl ? `
           <br><a class="link-inline" href="${escapar(pendente.retomarUrl)}" target="_blank" rel="noopener">
             ${pendente.retomarTipo === 'pagamento' ? 'Pagar agora' : 'Assinar o aditivo'}
           </a>` : ''}
-        ${pendente.podeDesistir ? `
-          · <button class="link-inline" data-desistir="${escapar(pendente.id)}">desistir desta compra</button>` : ''}
-        <br><span class="convite-sub">Enquanto esta compra não terminar, não dá para começar outra.</span>
       </div></div>` : ''}
 
     ${concluidas.length ? `
-      <div class="secao-titulo">Convites que você já comprou</div>
-      <div class="historico">
+      <div class="lista">
         ${concluidas.map((c) => `
-          <div class="historico-item">
-            <div>
-              <b>${escapar(linhaItens(c))}</b>
-              <span class="convite-sub">${escapar((ESTADO_COMPRA[c.status] || {}).rotulo || c.status)}${c.pagamento === 'cartao' ? ` · cartão ${c.parcelas_cartao || 1}×` : ' · nas parcelas'}</span>
+          <div class="item inerte">
+            <div class="quando">
+              <strong>${escapar(linhaItens(c))}</strong>
+              <span>${escapar((ESTADO_COMPRA[c.status] || {}).rotulo || c.status)}${c.pagamento === 'cartao' ? ` · cartão ${c.parcelas_cartao || 1}×` : ' · somado nas parcelas'} · ${brl(Number(c.valor_total || 0))}</span>
             </div>
-            <div>${brl(Number(c.valor_total || 0))}</div>
           </div>`).join('')}
       </div>` : ''}
   `;
@@ -2940,14 +2952,7 @@ function blocoDasCompras(historico) {
 async function telaConvites() {
   abrirFolha('<div class="vazio">Carregando…</div>');
   let oferta;
-  let historico = [];
-  try {
-    // As duas juntas: a oferta diz o que dá para comprar, o histórico diz se já
-    // existe uma compra no meio do caminho — e uma compra aberta bloqueia a outra.
-    const r = await Promise.all([chamar('/convites'), chamar('/convites/historico').catch(() => [])]);
-    oferta = r[0];
-    historico = Array.isArray(r[1]) ? r[1] : [];
-  }
+  try { oferta = await chamar('/convites'); }
   catch { return abrirFolha('<div class="vazio">Não foi possível abrir os convites agora.</div>'); }
 
   const escolhido = {};   // chave da festa -> quantidade (só as marcadas entram)
@@ -2962,13 +2967,10 @@ async function telaConvites() {
     // Festa sem preço cadastrado não é oferecida: vender a R$ 0 seria dar de graça.
     const disponiveis = oferta.festas.filter((f) => f.unitario !== null);
     const aVenda = disponiveis.filter((f) => f.podeComprar);
-    const fechadas = disponiveis.filter((f) => !f.podeComprar);
 
     abrirFolha(`
       <h2>Convites <em>extras</em></h2>
       <div class="sub">Escolha as festas, a quantidade e como pagar. O aditivo é assinado por e-mail.</div>
-
-      ${blocoDasCompras(historico)}
 
       ${oferta.bloqueio && !(oferta.pendenciasDeCadastro || []).length
         ? `<div class="faixa alerta"><div>${escapar(oferta.bloqueio)}</div></div>` : ''}
@@ -3011,13 +3013,6 @@ async function telaConvites() {
             ${!f.formas.boleto && f.motivo ? `<p class="rodape-nota" style="margin:6px 0 0">${escapar(f.motivo)}</p>` : ''}
           </div>`).join('')}
         ` : ''}
-
-      ${fechadas.length ? `
-        <div class="secao-titulo">Não disponíveis</div>
-        ${fechadas.map((f) => `
-          <div class="convite-item fechado">
-            <div class="convite-cab"><div><b>${escapar(f.rotulo)}</b><span class="convite-sub">${escapar(f.motivo || 'Indisponível no momento.')}</span></div></div>
-          </div>`).join('')}` : ''}
 
       ${!disponiveis.length ? '<div class="vazio">Esta turma ainda não tem convites extras à venda.</div>' : ''}
 
@@ -3074,6 +3069,15 @@ async function telaConvites() {
               ${previa.cartao.opcoes.map((o) => `<option value="${o.parcelas}" ${o.parcelas === parcelasCartao ? 'selected' : ''}>${o.parcelas}× de ${brlx(o.valorParcela)} — total ${brlx(o.valorTotal)}</option>`).join('')}
             </select>
           </div>` : ''}
+        ${/* NÃO HÁ DESISTIR depois daqui (decisão do Dani, 14/10): ele segue
+              com o aditivo. Então o compromisso precisa estar escrito antes do
+              botão, junto do valor — não escondido numa cláusula. */ ''}
+        ${previa && forma ? `
+          <p class="rodape-nota" style="margin:12px 0 0">
+            Ao confirmar, você ${forma === 'cartao' ? 'paga no cartão e assina' : 'assina'} o aditivo
+            de <b>${brlx(previa.valorConvites)}</b> em convites${forma === 'cartao' ? ` (<b>${brlx(previa.cartao.escolhida.valorTotal)}</b> com as taxas do banco)` : ''}.
+            A compra passa a fazer parte do seu contrato e não é desfeita pelo portal.
+          </p>` : ''}
         <div class="acoes dupla">
           <button class="botao" id="comprar" ${previa && forma ? '' : 'disabled'}>${forma === 'cartao' ? 'Ir para o pagamento' : 'Comprar e assinar'}</button>
           <button class="botao secundario" data-fechar-folha>Cancelar</button>
@@ -3148,20 +3152,6 @@ async function telaConvites() {
       recalcular();
     });
 
-    // Desistir só existe antes da assinatura, e o backend confere de novo.
-    el.querySelector('[data-desistir]')?.addEventListener('click', async (e) => {
-      const id = e.target.getAttribute('data-desistir');
-      e.target.disabled = true;
-      try {
-        await chamar(`/convites/${id}/desistir`, { method: 'POST' });
-        avisar('Compra desfeita. Você já pode começar outra.');
-        telaConvites();
-      } catch (err) {
-        e.target.disabled = false;
-        avisar((err && err.corpo && (err.corpo.message || err.corpo.erro)) || 'Não foi possível desfazer agora');
-      }
-    });
-
     el.querySelector('#comprar')?.addEventListener('click', async (e) => {
       const itens = itensEscolhidos();
       if (!itens.length || !forma) return;
@@ -3173,9 +3163,11 @@ async function telaConvites() {
         // paga primeiro e assina depois.
         if (r.url) window.open(r.url, '_blank', 'noopener');
         avisar(r.forma === 'cartao' ? 'Abrimos o pagamento no cartão' : 'Abrimos o aditivo para você assinar');
-        // A tela volta, agora mostrando a compra pendente: se o bloqueador de
-        // pop-up engolir a aba, ou ele fechá-la, o caminho de volta está ali.
-        telaConvites();
+        // Volta para o Contrato, que é onde a compra aparece com o link para
+        // assinar — inclusive se o bloqueador de pop-up engolir a aba nova.
+        fecharFolha();
+        estado.contrato = null;   // força reler, para a compra nova já aparecer
+        irPara('contrato');
       } catch (err) {
         e.target.disabled = false;
         e.target.textContent = forma === 'cartao' ? 'Ir para o pagamento' : 'Comprar e assinar';

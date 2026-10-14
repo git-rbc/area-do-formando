@@ -1024,6 +1024,15 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
   color: var(--accent-txt); text-decoration: underline; text-underline-offset: 2px;
 }
 .link-inline:hover { opacity: .8; }
+/* DENTRO DE UMA FAIXA, O LINK HERDA A COR DELA (14/10/2026). `--accent-txt` é
+   um roxo escuro que não muda no tema escuro, então um link dentro de uma faixa
+   de alerta sumia no fundo. Herdar a cor do aviso garante contraste nos dois
+   temas, e o sublinhado continua dizendo que é clicável. */
+.faixa .link-inline { color: inherit; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) .link-inline { color: var(--violet-soft); }
+}
+:root[data-tema="escuro"] .link-inline { color: var(--violet-soft); }
 
 /* Pedido de cancelamento (05/10/2026): existe, mas não chama atenção — texto
    pequeno e apagado no fim de "Contrato e convites", sem cor de link. */

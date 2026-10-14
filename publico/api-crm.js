@@ -482,11 +482,18 @@
     // (quanto, em quantas vezes, e o link do termo) sai de /me e /financeiro.
     // Sem isto a aba inteira morria em "não foi possível carregar".
     if (caminho === '/contrato') {
-      const [eu, fin] = await Promise.all([
+      // Os convites moram AQUI (pedido do Dani, 14/10): o que ele já tem, o
+      // que falta assinar e o que já passou do prazo. A tela de comprar fala
+      // só da compra que ele está fazendo agora.
+      const [eu, fin, oferta, compras] = await Promise.all([
         pedir('GET', '/me', null, token),
         pedir('GET', '/financeiro', null, token),
+        pedir('GET', '/convites', null, token).catch(() => null),
+        pedir('GET', '/convites/historico', null, token).catch(() => []),
       ]);
       const resumo = fin.resumo || {};
+      const festas = (oferta && oferta.festas) || [];
+
       return {
         termo: { assinadoEm: null, origem: null, url: null },
         contratoColetivo: { turma: eu.turma?.rotulo || eu.turma?.codigo || '', url: null },
@@ -496,7 +503,22 @@
           mensalidade: resumo.parcelas ? Math.round((resumo.contratado / resumo.parcelas) * 100) / 100 : 0,
           taxaBoleto: resumo.taxaBoleto || 0,
         },
-        convites: [],
+        // Quantos convites ele tem em cada festa: os do pacote mais os extras
+        // que comprou. `nomeados` fica fora — o CRM não cadastra nome de
+        // convidado (ver API_RECURSOS.convites).
+        convites: festas
+          .filter((f) => (f.inclusos || 0) > 0 || (f.jaComprados || 0) > 0)
+          .map((f) => ({
+            tipo: f.rotulo,
+            quantidade: (f.inclusos || 0) + (f.jaComprados || 0),
+            incluso: f.inclusos || 0,
+            valorUnitario: f.unitario || 0,
+            nomeados: null,
+          })),
+        compras: Array.isArray(compras) ? compras : [],
+        festasEncerradas: festas
+          .filter((f) => f.unitario !== null && !f.podeComprar && f.motivo)
+          .map((f) => ({ rotulo: f.rotulo, motivo: f.motivo })),
         clausulas: [],
       };
     }
@@ -508,9 +530,6 @@
     if (caminho === '/convites/historico' && metodo === 'GET') return pedir('GET', '/convites/historico', null, token);
     if (caminho === '/convites/simular' && metodo === 'POST') return pedir('POST', '/convites/simular', corpo || {}, token);
     if (caminho === '/convites/comprar' && metodo === 'POST') return pedir('POST', '/convites/comprar', corpo || {}, token);
-    // Desistir de uma compra não assinada: o id vai no caminho, e o CRM confere
-    // que a compra é da adesão desta sessão antes de desfazer.
-    if (metodo === 'POST' && /^\/convites\/[\w-]+\/desistir$/.test(caminho)) return pedir('POST', caminho, corpo || {}, token);
 
     // ── meus dados ───────────────────────────────────────────────────────────
     // O CRM devolve tudo o que a tela precisa, inclusive `lembreteDias`: com
