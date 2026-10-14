@@ -501,6 +501,14 @@
       };
     }
 
+    // ── convites extras ──────────────────────────────────────────────────────
+    // Compra de convite depois da adesão (14/10/2026). O CRM é quem sabe preço,
+    // lotação, prazo e forma de pagamento — o portal só desenha o que vier.
+    if (caminho === '/convites' && metodo === 'GET') return pedir('GET', '/convites', null, token);
+    if (caminho === '/convites/historico' && metodo === 'GET') return pedir('GET', '/convites/historico', null, token);
+    if (caminho === '/convites/simular' && metodo === 'POST') return pedir('POST', '/convites/simular', corpo || {}, token);
+    if (caminho === '/convites/comprar' && metodo === 'POST') return pedir('POST', '/convites/comprar', corpo || {}, token);
+
     // ── meus dados ───────────────────────────────────────────────────────────
     // O CRM devolve tudo o que a tela precisa, inclusive `lembreteDias`: com
     // quanta antecedência ele é avisado do vencimento hoje (mig 1053). Quem

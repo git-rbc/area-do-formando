@@ -1527,6 +1527,30 @@ async function api(req, res, url) {
   return responder(res, 404, { erro: 'rota_nao_encontrada', rota });
 }
 
+/**
+ * LIGAR O PORTAL LOCAL AO CRM LOCAL (14/10/2026).
+ *
+ * Com `API_CRM=http://localhost:3333/api/area-formando node servidor.mjs`, o
+ * index servido aqui recebe a URL da API e o portal passa a ler dados REAIS —
+ * é o único jeito de testar o que só existe no CRM (compra de convites, por
+ * exemplo), sem mexer no `publico/index.html`, que é o mesmo arquivo que vai
+ * ao ar.
+ *
+ * Sem a variável nada muda: o protótipo segue com os dados de exemplo.
+ */
+const API_CRM_LOCAL = process.env.API_CRM || '';
+
+function comApiDoCrm(html) {
+  if (!API_CRM_LOCAL) return html;
+  const tag = `<script>window.API_URL = ${JSON.stringify(API_CRM_LOCAL)};</script>`;
+  const texto = String(html);
+  // Antes do app.js, para o adaptador do CRM se instalar na carga.
+  return texto.includes('<script')
+    ? texto.replace('<script', `${tag}
+  <script`)
+    : texto + tag;
+}
+
 function estatico(req, res, url) {
   let caminho = url.pathname === '/' ? '/index.html' : url.pathname;
   if (caminho.startsWith('/formando')) caminho = caminho.replace(/^\/formando\/?/, '/') || '/index.html';
@@ -1537,12 +1561,12 @@ function estatico(req, res, url) {
       // SPA: qualquer rota desconhecida cai no index.
       fs.readFile(path.join(AQUI, 'publico', 'index.html'), (e2, html) => {
         if (e2) { res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }).end('não encontrado'); return; }
-        res.writeHead(200, { 'content-type': TIPOS['.html'] }); res.end(html);
+        res.writeHead(200, { 'content-type': TIPOS['.html'] }); res.end(comApiDoCrm(html));
       });
       return;
     }
     res.writeHead(200, { 'content-type': TIPOS[path.extname(arquivo)] || 'application/octet-stream', 'cache-control': 'no-store' });
-    res.end(conteudo);
+    res.end(path.extname(arquivo) === '.html' ? comApiDoCrm(conteudo) : conteudo);
   });
 }
 
@@ -1557,6 +1581,10 @@ http.createServer((req, res) => {
   const exemplos = DADOS.adesoes.slice(0, 3);
   console.log('');
   console.log('  Área do Formando — ambiente local de testes');
+  if (API_CRM_LOCAL) {
+    console.log(`  LIGADO AO CRM: ${API_CRM_LOCAL}`);
+    console.log('  Os dados são REAIS. Entre com o CPF de um formando de verdade.');
+  }
   console.log(`  http://localhost:${PORTA}/`);
   console.log('');
   console.log(`  ${DADOS.aviso}`);

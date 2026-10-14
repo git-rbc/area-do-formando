@@ -1036,3 +1036,93 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
 .destaque-faixa { font-weight: 600; background: var(--accent-fundo, rgba(123, 78, 194, .08)); border-radius: 6px; padding-left: 6px; padding-right: 6px; }
 .lista-simples { margin: 0 0 4px; padding-left: 18px; line-height: 1.6; font-size: 14px; }
 .lista-simples li { margin-bottom: 6px; }
+
+/* ---------- comprar convites extras (14/10/2026) ---------------------------
+   A tela em dois tempos: primeiro as festas (chips), e só a festa MARCADA
+   ganha o seletor de quantidade. Quatro campos de número abertos ao mesmo
+   tempo enchiam a folha de caixas que quase sempre ficavam em zero. */
+
+.festas-escolha { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+
+.festa-chip {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 9px 14px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--linha); background: var(--papel);
+  color: var(--texto); font: inherit; text-align: left;
+  transition: border-color .15s, background .15s, transform .1s;
+}
+.festa-chip:hover { border-color: var(--violet-soft); }
+.festa-chip:active { transform: translateY(1px); }
+.festa-chip .nome { font-size: 13.5px; font-weight: 600; }
+.festa-chip .preco { font-size: 11.5px; color: var(--texto-suave); }
+.festa-chip.ativo { border-color: var(--violet); background: var(--violet); color: #fff; }
+.festa-chip.ativo .preco { color: rgba(255,255,255,.82); }
+
+.convite-item {
+  border: 1px solid var(--linha); border-radius: 12px;
+  padding: 12px 14px; margin-bottom: 10px; background: var(--papel);
+}
+.convite-item.fechado { opacity: .72; }
+.convite-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.convite-cab b { font-size: 14px; }
+.convite-sub { display: block; font-size: 11.5px; color: var(--texto-suave); margin-top: 2px; }
+
+/* O seletor compacto: − quantidade + e a lixeira. */
+.passo { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.passo-btn, .passo-lixo {
+  width: 30px; height: 30px; display: grid; place-items: center;
+  border: 1px solid var(--linha); background: var(--fundo); color: var(--texto);
+  border-radius: 8px; cursor: pointer; font-size: 16px; line-height: 1; padding: 0;
+}
+.passo-btn:hover, .passo-lixo:hover { border-color: var(--violet); color: var(--violet); }
+.passo-qtd { min-width: 34px; text-align: center; font-weight: 600; font-size: 15px; }
+.passo-lixo { margin-left: 6px; }
+.passo-lixo svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.passo-lixo:hover { border-color: #B3261E; color: #B3261E; }
+
+.convite-linha-valor {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--linha);
+  font-size: 12.5px; color: var(--texto-suave);
+}
+.convite-linha-valor b { font-size: 14px; color: var(--texto); }
+
+.resumo-compra .dado.total { border-top: 1px solid var(--linha); margin-top: 4px; padding-top: 10px; }
+
+/* "de R$ 250,00" miúdo embaixo da data: o que a parcela custa HOJE, para o
+   valor grande ao lado ser lido como o que ela PASSA a custar. */
+.parcela-muda small { display: block; font-size: 11px; color: var(--texto-suave); margin-top: 1px; }
+
+/* O "?" dentro do botão de forma de pagamento. */
+.formas-pag button { display: inline-flex; align-items: center; gap: 6px; }
+.cita-pag { white-space: nowrap; }
+.formas-pag .ajuda { width: 17px; height: 17px; font-size: 11px; }
+
+/* As duas formas de pagamento, cada uma com o seu "?" ao lado. O "?" fica FORA
+   do botão de propósito: botão dentro de botão é HTML inválido, e o navegador
+   expulsa o de dentro — foi o que aconteceu na primeira versão. */
+.formas-pag { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+
+/* O PILL É O CONTAINER, não o botão: assim o "?" fica DENTRO da mesma borda,
+   centralizado com o texto. Botão dentro de botão seria HTML inválido — o
+   navegador expulsa o de dentro —, então a borda mora no container e o botão
+   vai transparente. */
+.forma-opcao {
+  display: inline-flex; align-items: center; gap: 8px;
+  /* Simétrico: o mesmo respiro antes do texto e depois do "?". */
+  padding: 0 15px 0 16px; border-radius: 999px;
+  border: 1px solid var(--linha); background: var(--papel);
+  transition: border-color .15s, background .15s;
+}
+.forma-opcao:hover { border-color: var(--violet-soft); }
+.forma-opcao > button {
+  padding: 9px 0; border: 0; background: none; cursor: pointer;
+  color: inherit; font: inherit; font-size: 13px; letter-spacing: .04em;
+}
+/* Dentro do pill o "?" é item flex: o deslocamento de 1px que ele usa no meio
+   de uma frase não se aplica aqui e só desalinha. */
+.forma-opcao .ajuda { margin-left: 0; vertical-align: 0; width: 17px; height: 17px; font-size: 11px; }
+.forma-opcao.ativo { background: var(--violet); border-color: var(--violet); color: #fff; }
+.forma-opcao.ativo .ajuda { border-color: rgba(255,255,255,.5); color: #fff; }
+.forma-opcao.ativo .ajuda:hover { background: #fff; color: var(--violet); border-color: #fff; }
+.forma-opcao .cita { display: inline-flex; align-items: center; }
