@@ -2882,10 +2882,72 @@ function balaoPagamento(forma) {
   return `<span class="cita cita-pag"><button class="ajuda" type="button" aria-label="Como funciona: ${escapar(a.titulo)}">?</button><span class="balao" role="tooltip"><b>${escapar(a.titulo)}</b>${escapar(a.texto)}</span></span>`;
 }
 
+/**
+ * O ESTADO DE UMA COMPRA QUE FICOU NO MEIO (14/10/2026).
+ *
+ * O aditivo abre em aba nova. Quem fechava sem assinar ficava preso: só pode
+ * haver uma compra aberta por vez, então não assinava nem comprava de novo — a
+ * saída era ligar para a equipe. Agora a compra pendente aparece no topo da
+ * tela, com o caminho de volta (assinar, ou pagar quando foi no cartão) e a
+ * opção de desistir enquanto não assinou.
+ */
+const ESTADO_COMPRA = {
+  aguardando_assinatura: { rotulo: 'Falta a sua assinatura', classe: 'alerta' },
+  assinado: { rotulo: 'Assinado — estamos atualizando suas parcelas', classe: '' },
+  aplicado: { rotulo: 'Concluída', classe: '' },
+  falhou: { rotulo: 'Deu problema — a equipe já está vendo', classe: 'alerta' },
+};
+
+function blocoDasCompras(historico) {
+  const vivas = (historico || []).filter((c) => c.status !== 'cancelado');
+  if (!vivas.length) return '';
+
+  const pendente = vivas.find((c) => c.status === 'aguardando_assinatura' || (c.retomarTipo === 'pagamento' && c.retomarUrl));
+  const concluidas = vivas.filter((c) => c !== pendente);
+
+  const linhaItens = (c) =>
+    (c.itens || []).map((i) => `${i.quantidade}× ${escapar(i.rotulo || i.festa || '')}`).join(', ');
+
+  return `
+    ${pendente ? `
+      <div class="faixa ${(ESTADO_COMPRA[pendente.status] || {}).classe || ''}" style="margin-bottom:12px"><div>
+        <b>${escapar((ESTADO_COMPRA[pendente.status] || {}).rotulo || 'Compra em andamento')}</b>
+        <br>${escapar(linhaItens(pendente))} · ${brl(Number(pendente.valor_total || 0))}
+        ${pendente.retomarUrl ? `
+          <br><a class="link-inline" href="${escapar(pendente.retomarUrl)}" target="_blank" rel="noopener">
+            ${pendente.retomarTipo === 'pagamento' ? 'Pagar agora' : 'Assinar o aditivo'}
+          </a>` : ''}
+        ${pendente.podeDesistir ? `
+          · <button class="link-inline" data-desistir="${escapar(pendente.id)}">desistir desta compra</button>` : ''}
+        <br><span class="convite-sub">Enquanto esta compra não terminar, não dá para começar outra.</span>
+      </div></div>` : ''}
+
+    ${concluidas.length ? `
+      <div class="secao-titulo">Convites que você já comprou</div>
+      <div class="historico">
+        ${concluidas.map((c) => `
+          <div class="historico-item">
+            <div>
+              <b>${escapar(linhaItens(c))}</b>
+              <span class="convite-sub">${escapar((ESTADO_COMPRA[c.status] || {}).rotulo || c.status)}${c.pagamento === 'cartao' ? ` · cartão ${c.parcelas_cartao || 1}×` : ' · nas parcelas'}</span>
+            </div>
+            <div>${brl(Number(c.valor_total || 0))}</div>
+          </div>`).join('')}
+      </div>` : ''}
+  `;
+}
+
 async function telaConvites() {
   abrirFolha('<div class="vazio">Carregando…</div>');
   let oferta;
-  try { oferta = await chamar('/convites'); }
+  let historico = [];
+  try {
+    // As duas juntas: a oferta diz o que dá para comprar, o histórico diz se já
+    // existe uma compra no meio do caminho — e uma compra aberta bloqueia a outra.
+    const r = await Promise.all([chamar('/convites'), chamar('/convites/historico').catch(() => [])]);
+    oferta = r[0];
+    historico = Array.isArray(r[1]) ? r[1] : [];
+  }
   catch { return abrirFolha('<div class="vazio">Não foi possível abrir os convites agora.</div>'); }
 
   const escolhido = {};   // chave da festa -> quantidade (só as marcadas entram)
@@ -2905,6 +2967,8 @@ async function telaConvites() {
     abrirFolha(`
       <h2>Convites <em>extras</em></h2>
       <div class="sub">Escolha as festas, a quantidade e como pagar. O aditivo é assinado por e-mail.</div>
+
+      ${blocoDasCompras(historico)}
 
       ${oferta.bloqueio && !(oferta.pendenciasDeCadastro || []).length
         ? `<div class="faixa alerta"><div>${escapar(oferta.bloqueio)}</div></div>` : ''}
@@ -3084,6 +3148,20 @@ async function telaConvites() {
       recalcular();
     });
 
+    // Desistir só existe antes da assinatura, e o backend confere de novo.
+    el.querySelector('[data-desistir]')?.addEventListener('click', async (e) => {
+      const id = e.target.getAttribute('data-desistir');
+      e.target.disabled = true;
+      try {
+        await chamar(`/convites/${id}/desistir`, { method: 'POST' });
+        avisar('Compra desfeita. Você já pode começar outra.');
+        telaConvites();
+      } catch (err) {
+        e.target.disabled = false;
+        avisar((err && err.corpo && (err.corpo.message || err.corpo.erro)) || 'Não foi possível desfazer agora');
+      }
+    });
+
     el.querySelector('#comprar')?.addEventListener('click', async (e) => {
       const itens = itensEscolhidos();
       if (!itens.length || !forma) return;
@@ -3091,11 +3169,13 @@ async function telaConvites() {
       e.target.textContent = 'Abrindo…';
       try {
         const r = await chamar('/convites/comprar', { method: 'POST', body: JSON.stringify({ itens, forma, parcelasCartao }) });
-        fecharFolha();
         // No boleto o link é da ASSINATURA; no cartão, do PAGAMENTO — lá ele
         // paga primeiro e assina depois.
         if (r.url) window.open(r.url, '_blank', 'noopener');
         avisar(r.forma === 'cartao' ? 'Abrimos o pagamento no cartão' : 'Abrimos o aditivo para você assinar');
+        // A tela volta, agora mostrando a compra pendente: se o bloqueador de
+        // pop-up engolir a aba, ou ele fechá-la, o caminho de volta está ali.
+        telaConvites();
       } catch (err) {
         e.target.disabled = false;
         e.target.textContent = forma === 'cartao' ? 'Ir para o pagamento' : 'Comprar e assinar';

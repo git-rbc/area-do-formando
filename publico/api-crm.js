@@ -508,6 +508,9 @@
     if (caminho === '/convites/historico' && metodo === 'GET') return pedir('GET', '/convites/historico', null, token);
     if (caminho === '/convites/simular' && metodo === 'POST') return pedir('POST', '/convites/simular', corpo || {}, token);
     if (caminho === '/convites/comprar' && metodo === 'POST') return pedir('POST', '/convites/comprar', corpo || {}, token);
+    // Desistir de uma compra não assinada: o id vai no caminho, e o CRM confere
+    // que a compra é da adesão desta sessão antes de desfazer.
+    if (metodo === 'POST' && /^\/convites\/[\w-]+\/desistir$/.test(caminho)) return pedir('POST', caminho, corpo || {}, token);
 
     // ── meus dados ───────────────────────────────────────────────────────────
     // O CRM devolve tudo o que a tela precisa, inclusive `lembreteDias`: com
