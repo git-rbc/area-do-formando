@@ -485,11 +485,12 @@
       // Os convites moram AQUI (pedido do Dani, 14/10): o que ele já tem, o
       // que falta assinar e o que já passou do prazo. A tela de comprar fala
       // só da compra que ele está fazendo agora.
-      const [eu, fin, oferta, compras] = await Promise.all([
+      const [eu, fin, oferta, compras, nomes] = await Promise.all([
         pedir('GET', '/me', null, token),
         pedir('GET', '/financeiro', null, token),
         pedir('GET', '/convites', null, token).catch(() => null),
         pedir('GET', '/convites/historico', null, token).catch(() => []),
+        pedir('GET', '/convites/nomes', null, token).catch(() => []),
       ]);
       const resumo = fin.resumo || {};
       const festas = (oferta && oferta.festas) || [];
@@ -513,7 +514,9 @@
             quantidade: (f.inclusos || 0) + (f.jaComprados || 0),
             incluso: f.inclusos || 0,
             valorUnitario: f.unitario || 0,
-            nomeados: null,
+            // Quantos já têm nome. A barra só aparece porque agora existe
+            // onde cadastrar (mig 1080); antes vinha null de propósito.
+            nomeados: ((nomes || []).find((n) => n.festa === f.chave) || {}).nomes?.length ?? 0,
           })),
         compras: Array.isArray(compras) ? compras : [],
         festasEncerradas: festas
@@ -530,6 +533,9 @@
     if (caminho === '/convites/historico' && metodo === 'GET') return pedir('GET', '/convites/historico', null, token);
     if (caminho === '/convites/simular' && metodo === 'POST') return pedir('POST', '/convites/simular', corpo || {}, token);
     if (caminho === '/convites/comprar' && metodo === 'POST') return pedir('POST', '/convites/comprar', corpo || {}, token);
+    // Quem entra com cada convite. O prazo (15 dias antes da festa) é do CRM.
+    if (caminho === '/convites/nomes' && metodo === 'GET') return pedir('GET', '/convites/nomes', null, token);
+    if (metodo === 'PUT' && /^\/convites\/nomes\/[\w-]+$/.test(caminho)) return pedir('PUT', caminho, corpo || {}, token);
 
     // ── meus dados ───────────────────────────────────────────────────────────
     // O CRM devolve tudo o que a tela precisa, inclusive `lembreteDias`: com

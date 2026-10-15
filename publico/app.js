@@ -2799,7 +2799,10 @@ function abaContrato() {
               <small>${cv.nomeados} de ${cv.quantidade} com nome na lista${cv.nomeados < cv.quantidade ? ' — faltam nomear' : ' ✓'}</small>`}
           </div>`;
       }).join('')}
-      <div class="acoes"><button class="botao secundario" id="pedir">Comprar convites extras</button></div>
+      <div class="acoes">
+        <button class="botao secundario" id="nomear">Dizer quem vai usar</button>
+        <button class="botao secundario" id="pedir">Comprar convites extras</button>
+      </div>
     </div>
 
     ${/* Festa que já passou do prazo de compra: fica aqui, fora da hora de
@@ -2843,6 +2846,127 @@ function abaContrato() {
     baixarArquivo('/contrato/termo/pdf', 'termo-de-adesao.pdf');
   }));
   app.querySelector('#pedir')?.addEventListener('click', telaConvites);
+  app.querySelector('#nomear')?.addEventListener('click', telaNomearConvidados);
+}
+
+/**
+ * QUEM VAI USAR CADA CONVITE (15/10/2026).
+ *
+ * A portaria precisa da lista pronta antes do dia, e a operação imprime com
+ * antecedência: por isso a lista FECHA 15 DIAS ANTES de cada festa. Depois
+ * disso ele não mexe mais — não é punição, é que a lista já saiu da mão dele.
+ *
+ * Um campo por convite, não um botão de "adicionar": ele sabe quantos tem, e
+ * ver os campos vazios é o que lembra de preencher. Dá para salvar pela
+ * metade e voltar depois — linha em branco simplesmente não entra.
+ */
+async function telaNomearConvidados() {
+  abrirFolha('<div class="vazio">Carregando…</div>');
+  let festas;
+  try { festas = await chamar('/convites/nomes'); }
+  catch { return abrirFolha('<div class="vazio">Não foi possível abrir seus convites agora.</div>'); }
+
+  if (!Array.isArray(festas) || !festas.length) {
+    return abrirFolha(`
+      <h2>Quem vai <em>usar</em></h2>
+      <div class="vazio">Você ainda não tem convites. Quando tiver, é aqui que você diz quem entra com cada um.</div>`);
+  }
+
+  // Rascunho por festa: o que está na tela, antes de salvar.
+  const rascunho = {};
+  for (const f of festas) {
+    rascunho[f.festa] = Array.from({ length: f.convites }, (_, i) => ({
+      nome: f.nomes[i]?.nome || '',
+      documento: f.nomes[i]?.documento || '',
+      telefone: f.nomes[i]?.telefone || '',
+      observacao: f.nomes[i]?.observacao || '',
+    }));
+  }
+
+  const desenhar = () => {
+    abrirFolha(`
+      <h2>Quem vai <em>usar</em></h2>
+      <div class="sub">Diga o nome de quem entra com cada convite seu. A portaria confere por essa lista.</div>
+
+      ${festas.map((f) => {
+        const linhas = rascunho[f.festa];
+        const preenchidos = linhas.filter((l) => l.nome.trim()).length;
+        return `
+        <div class="convite-item" data-festa="${f.festa}">
+          <div class="convite-cab">
+            <div>
+              <b>${escapar(f.rotulo)}</b>
+              <span class="convite-sub">
+                ${f.data ? `festa em ${dataCurta(f.data)}` : 'data a definir'} ·
+                ${preenchidos} de ${f.convites} ${f.convites === 1 ? 'convite' : 'convites'} com nome
+              </span>
+            </div>
+          </div>
+
+          ${!f.janela.aberta ? `
+            <div class="faixa alerta"><div>${escapar(f.janela.motivo || 'A lista desta festa já fechou.')}</div></div>
+            ${linhas.filter((l) => l.nome.trim()).map((l) => `
+              <div class="dado"><span>${escapar(l.nome)}</span><b>${escapar(l.documento || '')}</b></div>`).join('')
+              || '<p class="rodape-nota">Nenhum nome foi informado nesta festa.</p>'}`
+          : `
+            ${f.janela.fechaEm ? `
+              <p class="rodape-nota" style="margin:0 0 10px">
+                Você pode mudar esta lista até <b>${dataCurta(f.janela.fechaEm)}</b>${f.janela.diasParaFechar != null && f.janela.diasParaFechar <= 7 ? ` — faltam ${f.janela.diasParaFechar} ${f.janela.diasParaFechar === 1 ? 'dia' : 'dias'}` : ''}.
+              </p>` : ''}
+            ${linhas.map((l, i) => `
+              <div class="nome-convidado">
+                <span class="nome-n">${i + 1}</span>
+                <input type="text" placeholder="Nome completo do convidado" value="${escapar(l.nome)}"
+                       data-festa="${f.festa}" data-i="${i}" data-campo="nome" maxlength="160">
+                <input type="text" placeholder="Documento (opcional)" value="${escapar(l.documento)}"
+                       data-festa="${f.festa}" data-i="${i}" data-campo="documento" maxlength="40">
+                <input type="text" placeholder="Telefone (opcional)" value="${escapar(l.telefone)}"
+                       data-festa="${f.festa}" data-i="${i}" data-campo="telefone" maxlength="30">
+              </div>`).join('')}
+            <div class="acoes"><button class="botao" data-salvar="${f.festa}">Salvar esta lista</button></div>`}
+        </div>`;
+      }).join('')}
+
+      <p class="rodape-nota">
+        Pode preencher aos poucos: salve o que já souber e volte depois. Convite sem nome continua valendo —
+        só vai dar mais trabalho na portaria no dia.
+      </p>
+    `);
+
+    const el = document.querySelector('.folha');
+
+    el.querySelectorAll('input[data-campo]').forEach((input) => {
+      input.addEventListener('input', (e) => {
+        const { festa, i, campo } = e.target.dataset;
+        rascunho[festa][Number(i)][campo] = e.target.value;
+      });
+    });
+
+    el.querySelectorAll('[data-salvar]').forEach((botao) => {
+      botao.addEventListener('click', async (e) => {
+        const festa = e.target.getAttribute('data-salvar');
+        e.target.disabled = true;
+        e.target.textContent = 'Salvando…';
+        try {
+          const atualizadas = await chamar(`/convites/nomes/${festa}`, {
+            method: 'PUT',
+            body: JSON.stringify({ nomes: rascunho[festa] }),
+          });
+          if (Array.isArray(atualizadas)) festas = atualizadas;
+          avisar('Lista salva');
+          // O contrato mostra "N de M com nome": precisa reler.
+          estado.contrato = null;
+          desenhar();
+        } catch (err) {
+          e.target.disabled = false;
+          e.target.textContent = 'Salvar esta lista';
+          avisar((err && err.corpo && (err.corpo.message || err.corpo.erro)) || 'Não foi possível salvar agora');
+        }
+      });
+    });
+  };
+
+  desenhar();
 }
 
 /**
