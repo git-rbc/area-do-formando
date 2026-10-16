@@ -1044,6 +1044,15 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
   color: var(--accent-txt); text-decoration: underline; text-underline-offset: 2px;
 }
 .link-inline:hover { opacity: .8; }
+/* DENTRO DE UMA FAIXA, O LINK HERDA A COR DELA (14/10/2026). `--accent-txt` é
+   um roxo escuro que não muda no tema escuro, então um link dentro de uma faixa
+   de alerta sumia no fundo. Herdar a cor do aviso garante contraste nos dois
+   temas, e o sublinhado continua dizendo que é clicável. */
+.faixa .link-inline { color: inherit; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) .link-inline { color: var(--violet-soft); }
+}
+:root[data-tema="escuro"] .link-inline { color: var(--violet-soft); }
 
 /* Pedido de cancelamento (05/10/2026): existe, mas não chama atenção — texto
    pequeno e apagado no fim de "Contrato e convites", sem cor de link. */
@@ -1056,6 +1065,130 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
 .destaque-faixa { font-weight: 600; background: var(--accent-fundo, rgba(123, 78, 194, .08)); border-radius: 6px; padding-left: 6px; padding-right: 6px; }
 .lista-simples { margin: 0 0 4px; padding-left: 18px; line-height: 1.6; font-size: 14px; }
 .lista-simples li { margin-bottom: 6px; }
+
+/* ---------- comprar convites extras (14/10/2026) ---------------------------
+   A tela em dois tempos: primeiro as festas (chips), e só a festa MARCADA
+   ganha o seletor de quantidade. Quatro campos de número abertos ao mesmo
+   tempo enchiam a folha de caixas que quase sempre ficavam em zero. */
+
+.festas-escolha { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+
+.festa-chip {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 9px 14px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--linha); background: var(--papel);
+  color: var(--texto); font: inherit; text-align: left;
+  transition: border-color .15s, background .15s, transform .1s;
+}
+.festa-chip:hover { border-color: var(--violet-soft); }
+.festa-chip:active { transform: translateY(1px); }
+.festa-chip .nome { font-size: 13.5px; font-weight: 600; }
+.festa-chip .preco { font-size: 11.5px; color: var(--texto-suave); }
+.festa-chip.ativo { border-color: var(--violet); background: var(--violet); color: #fff; }
+.festa-chip.ativo .preco { color: rgba(255,255,255,.82); }
+
+.convite-item {
+  border: 1px solid var(--linha); border-radius: 12px;
+  padding: 12px 14px; margin-bottom: 10px; background: var(--papel);
+}
+.convite-item.fechado { opacity: .72; }
+.convite-cab { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.convite-cab b { font-size: 14px; }
+.convite-sub { display: block; font-size: 11.5px; color: var(--texto-suave); margin-top: 2px; }
+
+/* O seletor compacto: − quantidade + e a lixeira. */
+.passo { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.passo-btn, .passo-lixo {
+  width: 30px; height: 30px; display: grid; place-items: center;
+  border: 1px solid var(--linha); background: var(--fundo); color: var(--texto);
+  border-radius: 8px; cursor: pointer; font-size: 16px; line-height: 1; padding: 0;
+}
+.passo-btn:hover, .passo-lixo:hover { border-color: var(--violet); color: var(--violet); }
+.passo-qtd { min-width: 34px; text-align: center; font-weight: 600; font-size: 15px; }
+.passo-lixo { margin-left: 6px; }
+.passo-lixo svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.passo-lixo:hover { border-color: #B3261E; color: #B3261E; }
+
+.convite-linha-valor {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--linha);
+  font-size: 12.5px; color: var(--texto-suave);
+}
+.convite-linha-valor b { font-size: 14px; color: var(--texto); }
+
+.resumo-compra .dado.total { border-top: 1px solid var(--linha); margin-top: 4px; padding-top: 10px; }
+
+/* "de R$ 250,00" miúdo embaixo da data: o que a parcela custa HOJE, para o
+   valor grande ao lado ser lido como o que ela PASSA a custar. */
+.parcela-muda small { display: block; font-size: 11px; color: var(--texto-suave); margin-top: 1px; }
+
+/* O "?" dentro do botão de forma de pagamento. */
+.formas-pag button { display: inline-flex; align-items: center; gap: 6px; }
+.cita-pag { white-space: nowrap; }
+.formas-pag .ajuda { width: 17px; height: 17px; font-size: 11px; }
+
+/* As duas formas de pagamento, cada uma com o seu "?" ao lado. O "?" fica FORA
+   do botão de propósito: botão dentro de botão é HTML inválido, e o navegador
+   expulsa o de dentro — foi o que aconteceu na primeira versão. */
+.formas-pag { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+
+/* O PILL É O CONTAINER, não o botão: assim o "?" fica DENTRO da mesma borda,
+   centralizado com o texto. Botão dentro de botão seria HTML inválido — o
+   navegador expulsa o de dentro —, então a borda mora no container e o botão
+   vai transparente. */
+.forma-opcao {
+  display: inline-flex; align-items: center; gap: 8px;
+  /* Simétrico: o mesmo respiro antes do texto e depois do "?". */
+  padding: 0 15px 0 16px; border-radius: 999px;
+  border: 1px solid var(--linha); background: var(--papel);
+  transition: border-color .15s, background .15s;
+}
+.forma-opcao:hover { border-color: var(--violet-soft); }
+.forma-opcao > button {
+  padding: 9px 0; border: 0; background: none; cursor: pointer;
+  color: inherit; font: inherit; font-size: 13px; letter-spacing: .04em;
+}
+/* Dentro do pill o "?" é item flex: o deslocamento de 1px que ele usa no meio
+   de uma frase não se aplica aqui e só desalinha. */
+.forma-opcao .ajuda { margin-left: 0; vertical-align: 0; width: 17px; height: 17px; font-size: 11px; }
+.forma-opcao.ativo { background: var(--violet); border-color: var(--violet); color: #fff; }
+.forma-opcao.ativo .ajuda { border-color: rgba(255,255,255,.5); color: #fff; }
+.forma-opcao.ativo .ajuda:hover { background: #fff; color: var(--violet); border-color: #fff; }
+.forma-opcao .cita { display: inline-flex; align-items: center; }
+
+/* QUEM VAI USAR CADA CONVITE (15/10/2026).
+   Uma linha por convite, numerada: ver os campos vazios é o que lembra de
+   preencher. No celular as caixas empilham — o nome primeiro, que é o que
+   importa; documento e telefone são opcionais e podem ficar para depois. */
+.nome-convidado {
+  display: grid; grid-template-columns: 22px minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px; align-items: center; margin-top: 8px;
+}
+.nome-convidado .nome-n {
+  font-size: 11.5px; color: var(--texto-suave); font-variant-numeric: tabular-nums; text-align: right;
+}
+.nome-convidado input {
+  width: 100%; padding: 9px 10px; font: inherit; font-size: 13.5px;
+  border: 1px solid var(--linha); border-radius: 9px;
+  background: transparent; color: var(--texto);
+}
+.nome-convidado input:focus { border-color: var(--violet); box-shadow: 0 0 0 3px rgba(123, 78, 194, .16); outline: none; }
+@media (max-width: 640px) {
+  .nome-convidado { grid-template-columns: 22px minmax(0, 1fr); }
+  .nome-convidado input:first-of-type { grid-column: 2; }
+  .nome-convidado input + input { grid-column: 2; }
+}
+
+/* O CÓDIGO DO PIX (16/10/2026): feito para ser copiado, não lido. Monoespaçado
+   e quebrando em qualquer ponto, porque é uma linha longa sem espaços; e
+   selecionável de uma vez para quem copiar à mão. */
+.pix-codigo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px; line-height: 1.5; word-break: break-all; user-select: all;
+  border: 1px solid var(--linha); border-radius: 10px;
+  padding: 12px; margin: 4px 0 10px; background: var(--papel);
+  max-height: 150px; overflow-y: auto;
+}
 
 </style>
 </head>
@@ -2506,11 +2639,19 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
     // (quanto, em quantas vezes, e o link do termo) sai de /me e /financeiro.
     // Sem isto a aba inteira morria em "não foi possível carregar".
     if (caminho === '/contrato') {
-      const [eu, fin] = await Promise.all([
+      // Os convites moram AQUI (pedido do Dani, 14/10): o que ele já tem, o
+      // que falta assinar e o que já passou do prazo. A tela de comprar fala
+      // só da compra que ele está fazendo agora.
+      const [eu, fin, oferta, compras, nomes] = await Promise.all([
         pedir('GET', '/me', null, token),
         pedir('GET', '/financeiro', null, token),
+        pedir('GET', '/convites', null, token).catch(() => null),
+        pedir('GET', '/convites/historico', null, token).catch(() => []),
+        pedir('GET', '/convites/nomes', null, token).catch(() => []),
       ]);
       const resumo = fin.resumo || {};
+      const festas = (oferta && oferta.festas) || [];
+
       return {
         termo: { assinadoEm: null, origem: null, url: null },
         contratoColetivo: { turma: eu.turma?.rotulo || eu.turma?.codigo || '', url: null },
@@ -2520,10 +2661,40 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
           mensalidade: resumo.parcelas ? Math.round((resumo.contratado / resumo.parcelas) * 100) / 100 : 0,
           taxaBoleto: resumo.taxaBoleto || 0,
         },
-        convites: [],
+        // Quantos convites ele tem em cada festa: os do pacote mais os extras
+        // que comprou. `nomeados` fica fora — o CRM não cadastra nome de
+        // convidado (ver API_RECURSOS.convites).
+        convites: festas
+          .filter((f) => (f.inclusos || 0) > 0 || (f.jaComprados || 0) > 0)
+          .map((f) => ({
+            tipo: f.rotulo,
+            quantidade: (f.inclusos || 0) + (f.jaComprados || 0),
+            incluso: f.inclusos || 0,
+            valorUnitario: f.unitario || 0,
+            // Quantos já têm nome. A barra só aparece porque agora existe
+            // onde cadastrar (mig 1080); antes vinha null de propósito.
+            nomeados: ((nomes || []).find((n) => n.festa === f.chave) || {}).nomes?.length ?? 0,
+          })),
+        compras: Array.isArray(compras) ? compras : [],
+        festasEncerradas: festas
+          .filter((f) => f.unitario !== null && !f.podeComprar && f.motivo)
+          .map((f) => ({ rotulo: f.rotulo, motivo: f.motivo })),
         clausulas: [],
       };
     }
+
+    // ── convites extras ──────────────────────────────────────────────────────
+    // Compra de convite depois da adesão (14/10/2026). O CRM é quem sabe preço,
+    // lotação, prazo e forma de pagamento — o portal só desenha o que vier.
+    if (caminho === '/convites' && metodo === 'GET') return pedir('GET', '/convites', null, token);
+    if (caminho === '/convites/historico' && metodo === 'GET') return pedir('GET', '/convites/historico', null, token);
+    if (caminho === '/convites/simular' && metodo === 'POST') return pedir('POST', '/convites/simular', corpo || {}, token);
+    if (caminho === '/convites/comprar' && metodo === 'POST') return pedir('POST', '/convites/comprar', corpo || {}, token);
+    // Quem entra com cada convite. O prazo (15 dias antes da festa) é do CRM.
+    // "o Pix já caiu?" — a tela pergunta enquanto o código está na frente dele.
+    if (metodo === 'GET' && /^\/convites\/[\w-]+\/pix$/.test(caminho)) return pedir('GET', caminho, null, token);
+    if (caminho === '/convites/nomes' && metodo === 'GET') return pedir('GET', '/convites/nomes', null, token);
+    if (metodo === 'PUT' && /^\/convites\/nomes\/[\w-]+$/.test(caminho)) return pedir('PUT', caminho, corpo || {}, token);
 
     // ── meus dados ───────────────────────────────────────────────────────────
     // O CRM devolve tudo o que a tela precisa, inclusive `lembreteDias`: com
@@ -2706,6 +2877,8 @@ const esquecer = () => { try { sessionStorage.removeItem('formando_token'); } ca
 const brl = (v) => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dataCurta = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
 const dataLonga = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
+/** A hora de um instante completo (ISO), para "o código vale até 14:35". */
+const horaCurta = (iso) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
 const mesAno = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '—';
 const escapar = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -3019,6 +3192,7 @@ const ICONES = {
   pessoa: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20.5c0-3.6 3.2-6.2 7.2-6.2s7.2 2.6 7.2 6.2"/></svg>',
   pedidos: '<svg viewBox="0 0 24 24"><path d="M8 4.5h8a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z"/><path d="M9.5 9h5M9.5 13h5M9.5 17h3M9 4.5V3.5h6v1"/></svg>',
   anexo: '<svg viewBox="0 0 24 24"><path d="M14 6.5 8 12.5a3 3 0 0 0 4.2 4.2l6.3-6.3a5 5 0 0 0-7-7L5 9.7a7 7 0 0 0 9.9 9.9l5-5"/></svg>',
+  lixeira: '<svg viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V5.2A1.2 1.2 0 0 1 10.7 4h2.6a1.2 1.2 0 0 1 1.2 1.2V7"/><path d="M6.5 7l.9 12.2A1.8 1.8 0 0 0 9.2 21h5.6a1.8 1.8 0 0 0 1.8-1.8L17.5 7"/><path d="M10.5 11v6M13.5 11v6"/></svg>',
   sino: '<svg viewBox="0 0 24 24"><path d="M6 9a6 6 0 1 1 12 0c0 4 1.5 5.5 2 6.5H4c.5-1 2-2.5 2-6.5Z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>',
   recibo: '<svg viewBox="0 0 24 24"><path d="M5 3.5h14v17l-2.3-1.5-2.4 1.5-2.3-1.5-2.3 1.5L7.4 19 5 20.5Z"/><path d="M9 8.5h6M9 12.5h6"/></svg>',
   antecipar: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.2 2"/></svg>',
@@ -5441,6 +5615,7 @@ function abaContrato() {
     </div>
 
     <div class="secao-titulo">Seus convites</div>
+    ${blocoDasCompras(c.compras)}
     <div class="cartao">
       ${c.convites.map((cv) => {
         const pct = cv.quantidade ? Math.min(100, (cv.nomeados || 0) / cv.quantidade * 100) : 0;
@@ -5450,12 +5625,27 @@ function abaContrato() {
               <span>${escapar(cv.tipo)}${cv.quantidade > cv.incluso ? ` <small>(${cv.incluso} no pacote + ${cv.quantidade - cv.incluso} extra)</small>` : ''}</span>
               <b>${cv.quantidade}${cv.valorUnitario ? ` · ${brl(cv.valorUnitario)}` : ' · incluso'}</b>
             </div>
-            <div class="convite-barra"><i style="width:${pct.toFixed(0)}%"></i></div>
-            <small>${cv.nomeados || 0} de ${cv.quantidade} com nome na lista${(cv.nomeados || 0) < cv.quantidade ? ' — faltam nomear' : ' ✓'}</small>
+            ${/* A barra é de convidados NOMEADOS, que só existe onde há lista
+                  de nomes. No CRM não há onde cadastrar isso, e aí a linha vem
+                  com `nomeados: null` — mostrar "0 de 3 nomeados" seria inventar
+                  uma pendência que o formando não tem como resolver. */ ''}
+            ${cv.nomeados == null ? '' : `
+              <div class="convite-barra"><i style="width:${pct.toFixed(0)}%"></i></div>
+              <small>${cv.nomeados} de ${cv.quantidade} com nome na lista${cv.nomeados < cv.quantidade ? ' — faltam nomear' : ' ✓'}</small>`}
           </div>`;
       }).join('')}
-      <div class="acoes"><button class="botao secundario" id="pedir">Pedir convites extras</button></div>
+      <div class="acoes">
+        <button class="botao secundario" id="nomear">Dizer quem vai usar</button>
+        <button class="botao secundario" id="pedir">Comprar convites extras</button>
+      </div>
     </div>
+
+    ${/* Festa que já passou do prazo de compra: fica aqui, fora da hora de
+          escolher, só para ele entender por que ela não aparece lá. */ ''}
+    ${(c.festasEncerradas || []).length ? `
+      <p class="rodape-nota">
+        Sem venda de convite agora: ${c.festasEncerradas.map((f) => `<b>${escapar(f.rotulo)}</b> (${escapar(f.motivo || 'indisponível')})`).join(' · ')}
+      </p>` : ''}
 
     ${(() => {
       // Aqui só cabem os pedidos que mexem no contrato; o resto mora em Meus pedidos.
@@ -5490,47 +5680,575 @@ function abaContrato() {
     if (estado.config?.demo) return avisar('No app de verdade, abre o termo assinado em PDF');
     baixarArquivo('/contrato/termo/pdf', 'termo-de-adesao.pdf');
   }));
-  app.querySelector('#pedir')?.addEventListener('click', formularioConvites);
+  app.querySelector('#pedir')?.addEventListener('click', telaConvites);
+  app.querySelector('#nomear')?.addEventListener('click', telaNomearConvidados);
 }
 
-function formularioConvites() {
-  const tipos = estado.contrato.convites.map((c) => c.tipo);
-  abrirFolha(`
-    <h2>Convites extras</h2>
-    <div class="sub">A equipe confere a disponibilidade e faz o aditivo com você. Nada é cobrado automaticamente.</div>
-    <div class="campo">
-      <label for="tipo">Qual convite</label>
-      <select id="tipo">${tipos.map((t) => `<option>${escapar(t)}</option>`).join('')}</select>
-    </div>
-    <div class="campo">
-      <label for="qtd">Quantos</label>
-      <input id="qtd" type="number" min="1" max="20" value="1" />
-    </div>
-    <div class="campo">
-      <label for="msg">Alguma observação</label>
-      <textarea id="msg" placeholder="Opcional"></textarea>
-    </div>
-    <div class="acoes dupla">
-      <button class="botao" id="enviar">Enviar pedido</button>
-      <button class="botao secundario" data-fechar-folha>Cancelar</button>
-    </div>`, (el) => {
-    el.querySelector('#enviar').addEventListener('click', async (e) => {
-      e.target.disabled = true; e.target.textContent = 'Enviando…';
-      try {
-        await chamar('/solicitacoes', {
-          method: 'POST',
-          body: JSON.stringify({
-            tipo: 'convites_extras',
-            conviteTipo: el.querySelector('#tipo').value,
-            quantidade: Number(el.querySelector('#qtd').value),
-            mensagem: `${el.querySelector('#qtd').value}× ${el.querySelector('#tipo').value}. ${el.querySelector('#msg').value}`.trim(),
-          }),
-        });
-        estado.contrato = await chamar('/contrato');
-        fecharFolha(); abaContrato(); avisar('Pedido enviado para a equipe');
-      } catch { avisar('Não foi possível enviar agora'); }
+/**
+ * QUEM VAI USAR CADA CONVITE (15/10/2026).
+ *
+ * A portaria precisa da lista pronta antes do dia, e a operação imprime com
+ * antecedência: por isso a lista FECHA 15 DIAS ANTES de cada festa. Depois
+ * disso ele não mexe mais — não é punição, é que a lista já saiu da mão dele.
+ *
+ * Um campo por convite, não um botão de "adicionar": ele sabe quantos tem, e
+ * ver os campos vazios é o que lembra de preencher. Dá para salvar pela
+ * metade e voltar depois — linha em branco simplesmente não entra.
+ */
+async function telaNomearConvidados() {
+  abrirFolha('<div class="vazio">Carregando…</div>');
+  let festas;
+  try { festas = await chamar('/convites/nomes'); }
+  catch { return abrirFolha('<div class="vazio">Não foi possível abrir seus convites agora.</div>'); }
+
+  if (!Array.isArray(festas) || !festas.length) {
+    return abrirFolha(`
+      <h2>Quem vai <em>usar</em></h2>
+      <div class="vazio">Você ainda não tem convites. Quando tiver, é aqui que você diz quem entra com cada um.</div>`);
+  }
+
+  // Rascunho por festa: o que está na tela, antes de salvar.
+  const rascunho = {};
+  for (const f of festas) {
+    rascunho[f.festa] = Array.from({ length: f.convites }, (_, i) => ({
+      nome: f.nomes[i]?.nome || '',
+      documento: f.nomes[i]?.documento || '',
+      telefone: f.nomes[i]?.telefone || '',
+      observacao: f.nomes[i]?.observacao || '',
+    }));
+  }
+
+  const desenhar = () => {
+    abrirFolha(`
+      <h2>Quem vai <em>usar</em></h2>
+      <div class="sub">Diga o nome de quem entra com cada convite seu. A portaria confere por essa lista.</div>
+
+      ${festas.map((f) => {
+        const linhas = rascunho[f.festa];
+        const preenchidos = linhas.filter((l) => l.nome.trim()).length;
+        return `
+        <div class="convite-item" data-festa="${f.festa}">
+          <div class="convite-cab">
+            <div>
+              <b>${escapar(f.rotulo)}</b>
+              <span class="convite-sub">
+                ${f.data ? `festa em ${dataCurta(f.data)}` : 'data a definir'} ·
+                ${preenchidos} de ${f.convites} ${f.convites === 1 ? 'convite' : 'convites'} com nome
+              </span>
+            </div>
+          </div>
+
+          ${!f.janela.aberta ? `
+            <div class="faixa alerta"><div>${escapar(f.janela.motivo || 'A lista desta festa já fechou.')}</div></div>
+            ${linhas.filter((l) => l.nome.trim()).map((l) => `
+              <div class="dado"><span>${escapar(l.nome)}</span><b>${escapar(l.documento || '')}</b></div>`).join('')
+              || '<p class="rodape-nota">Nenhum nome foi informado nesta festa.</p>'}`
+          : `
+            ${f.janela.fechaEm ? `
+              <p class="rodape-nota" style="margin:0 0 10px">
+                Você pode mudar esta lista até <b>${dataCurta(f.janela.fechaEm)}</b>${f.janela.diasParaFechar != null && f.janela.diasParaFechar <= 7 ? ` — faltam ${f.janela.diasParaFechar} ${f.janela.diasParaFechar === 1 ? 'dia' : 'dias'}` : ''}.
+              </p>` : ''}
+            ${linhas.map((l, i) => `
+              <div class="nome-convidado">
+                <span class="nome-n">${i + 1}</span>
+                <input type="text" placeholder="Nome completo do convidado" value="${escapar(l.nome)}"
+                       data-festa="${f.festa}" data-i="${i}" data-campo="nome" maxlength="160">
+                <input type="text" placeholder="Documento (opcional)" value="${escapar(l.documento)}"
+                       data-festa="${f.festa}" data-i="${i}" data-campo="documento" maxlength="40">
+                <input type="text" placeholder="Telefone (opcional)" value="${escapar(l.telefone)}"
+                       data-festa="${f.festa}" data-i="${i}" data-campo="telefone" maxlength="30">
+              </div>`).join('')}
+            <div class="acoes"><button class="botao" data-salvar="${f.festa}">Salvar esta lista</button></div>`}
+        </div>`;
+      }).join('')}
+
+      <p class="rodape-nota">
+        Pode preencher aos poucos: salve o que já souber e volte até a data limite para nomear o que falta ou alterar.
+      </p>
+    `);
+
+    const el = document.querySelector('.folha');
+
+    el.querySelectorAll('input[data-campo]').forEach((input) => {
+      input.addEventListener('input', (e) => {
+        const { festa, i, campo } = e.target.dataset;
+        rascunho[festa][Number(i)][campo] = e.target.value;
+      });
     });
-  });
+
+    el.querySelectorAll('[data-salvar]').forEach((botao) => {
+      botao.addEventListener('click', async (e) => {
+        const festa = e.target.getAttribute('data-salvar');
+        e.target.disabled = true;
+        e.target.textContent = 'Salvando…';
+        try {
+          const atualizadas = await chamar(`/convites/nomes/${festa}`, {
+            method: 'PUT',
+            body: JSON.stringify({ nomes: rascunho[festa] }),
+          });
+          if (Array.isArray(atualizadas)) festas = atualizadas;
+          avisar('Lista salva');
+          // O contrato mostra "N de M com nome": precisa reler.
+          estado.contrato = null;
+          desenhar();
+        } catch (err) {
+          e.target.disabled = false;
+          e.target.textContent = 'Salvar esta lista';
+          avisar((err && err.corpo && (err.corpo.message || err.corpo.erro)) || 'Não foi possível salvar agora');
+        }
+      });
+    });
+  };
+
+  desenhar();
+}
+
+/**
+ * COMPRAR CONVITES EXTRAS (14/10/2026).
+ *
+ * Antes isto era um PEDIDO: o formando dizia quantos queria e a equipe fazia o
+ * resto à mão. Agora é compra de verdade — ele escolhe as festas, a quantidade,
+ * vê quanto fica e assina o aditivo.
+ *
+ * A TELA EM DOIS TEMPOS (pedido do Dani, 14/10): primeiro ele MARCA de quais
+ * festas quer convite; só então aparece o seletor de quantidade daquela festa.
+ * Mostrar quatro campos de quantidade de uma vez enchia a tela de caixas que
+ * quase sempre ficavam em zero.
+ *
+ * O QUE A TELA PRECISA DIZER ANTES DE ELE ESCOLHER, porque tudo isso muda o
+ * preço ou impede a compra: quantos convites já tem, quantos cabem na festa,
+ * até quando dá para comprar, e que a taxa do cartão é DO BANCO, não da casa.
+ */
+
+/** Explicação de cada forma de pagamento, no balão do "?". */
+const AJUDA_PAGAMENTO = {
+  pix: {
+    titulo: 'Pix',
+    texto:
+      'Você paga na hora, sem taxa nenhuma: o valor é o dos convites. '
+      + 'Assim que o pagamento cair, abrimos o aditivo para você assinar. '
+      + 'O código vale por alguns minutos — se expirar, é só gerar outro.',
+  },
+  cartao: {
+    titulo: 'Cartão de crédito',
+    texto:
+      'À vista ou em até 10 vezes. A taxa de utilização e os juros do parcelamento são cobrados '
+      + 'pela operadora do cartão (o banco), não pelo Indaiá — por isso o total fica maior que o '
+      + 'preço dos convites. O valor exato aparece antes de você confirmar. '
+      + 'Se um dia houver devolução, volta o valor dos convites: a taxa e os juros ficam com a '
+      + 'operadora e não são devolvidos pelo Indaiá.',
+  },
+};
+
+/** Um "?" com balão, para explicar um detalhe sem encher a tela de texto. */
+function balaoAjuda(titulo, texto) {
+  return '<span class="cita"><button class="ajuda" type="button" aria-label="' + escapar(titulo)
+    + '">?</button><span class="balao" role="tooltip"><b>' + escapar(titulo) + '</b>'
+    + escapar(texto) + '</span></span>';
+}
+
+function balaoPagamento(forma) {
+  const a = AJUDA_PAGAMENTO[forma];
+  if (!a) return '';
+  return `<span class="cita cita-pag"><button class="ajuda" type="button" aria-label="Como funciona: ${escapar(a.titulo)}">?</button><span class="balao" role="tooltip"><b>${escapar(a.titulo)}</b>${escapar(a.texto)}</span></span>`;
+}
+
+/**
+ * COMO CADA ESTADO DE COMPRA SE CHAMA PARA O FORMANDO.
+ *
+ * Isto mora na tela de CONTRATO, não na de comprar (pedido do Dani, 14/10): a
+ * hora de escolher convite deve falar só da compra que ele está fazendo. O que
+ * ele já tem, o que falta assinar e o que já passou ficam no Contrato, junto
+ * com os documentos.
+ *
+ * Não existe desistir: depois de pedir, ele segue com o aditivo. Por isso a
+ * tela de compra precisa dizer com todas as letras o que ele está levando e
+ * quanto vai pagar ANTES de confirmar.
+ */
+const ESTADO_COMPRA = {
+  aguardando_assinatura: { rotulo: 'Falta a sua assinatura', classe: 'alerta' },
+  assinado: { rotulo: 'Assinado — estamos atualizando suas parcelas', classe: '' },
+  aplicado: { rotulo: 'Concluída', classe: '' },
+  falhou: { rotulo: 'Deu problema — a equipe já está vendo', classe: 'alerta' },
+};
+
+/** O que o formando já tem e o que ficou pendente — desenhado na aba Contrato. */
+function blocoDasCompras(historico) {
+  const vivas = (historico || []).filter((c) => c.status !== 'cancelado');
+  if (!vivas.length) return '';
+
+  const pendente = vivas.find((c) => c.status === 'aguardando_assinatura' || (c.retomarTipo === 'pagamento' && c.retomarUrl));
+  const concluidas = vivas.filter((c) => c !== pendente);
+
+  const linhaItens = (c) =>
+    (c.itens || []).map((i) => `${i.quantidade}× ${escapar(i.rotulo || i.festa || '')}`).join(', ');
+
+  return `
+    ${pendente ? `
+      <div class="faixa ${(ESTADO_COMPRA[pendente.status] || {}).classe || ''}"><div>
+        <b>${escapar((ESTADO_COMPRA[pendente.status] || {}).rotulo || 'Compra em andamento')}</b>
+        <br>${escapar(linhaItens(pendente))} · ${brl(Number(pendente.valor_total || 0))}
+        ${pendente.retomarUrl ? `
+          <br><a class="link-inline" href="${escapar(pendente.retomarUrl)}" target="_blank" rel="noopener">
+            ${pendente.retomarTipo === 'pagamento' ? 'Pagar agora' : 'Assinar o aditivo'}
+          </a>` : ''}
+      </div></div>` : ''}
+
+    ${concluidas.length ? `
+      <div class="lista">
+        ${concluidas.map((c) => `
+          <div class="item inerte">
+            <div class="quando">
+              <strong>${escapar(linhaItens(c))}</strong>
+              <span>${escapar((ESTADO_COMPRA[c.status] || {}).rotulo || c.status)}${c.pagamento === 'cartao' ? ` · cartão ${c.parcelas_cartao || 1}×` : ' · somado nas parcelas'} · ${brl(Number(c.valor_total || 0))}</span>
+            </div>
+          </div>`).join('')}
+      </div>` : ''}
+  `;
+}
+
+/**
+ * O PIX DO CONVITE (16/10/2026).
+ *
+ * O código fica na frente dele até o pagamento cair. A tela pergunta sozinha,
+ * de poucos em poucos segundos — perguntar é barato e a alternativa é o
+ * formando ficar recarregando a página para saber se deu certo.
+ *
+ * Quem confirma o pagamento é o banco, não esta tela: aqui só se mostra o que
+ * já aconteceu. Quando cair, o aditivo é aberto automaticamente e ele vai
+ * assinar.
+ */
+function telaPixDoConvite(compra) {
+  let parar = false;
+  const copiaECola = compra.pixCopiaECola || '';
+
+  const desenhar = (situacao) => {
+    const pago = situacao && situacao.pago;
+    abrirFolha(`
+      <h2>Pague com <em>Pix</em></h2>
+      <div class="sub">${brl(Number(compra.valor || 0))} em convites. Assim que o pagamento cair, abrimos o aditivo para você assinar.</div>
+
+      ${pago ? `
+        <div class="faixa"><div>
+          <b>Pagamento confirmado.</b><br>
+          Estamos preparando seu aditivo — ele aparece em <b>Contrato</b>, em "Seus convites", para você assinar.
+        </div></div>
+        <div class="acoes"><button class="botao" id="ir-contrato">Ver em Contrato</button></div>`
+      : `
+        ${copiaECola ? `
+          <div class="pix-codigo" id="pix-codigo">${escapar(copiaECola)}</div>
+          <div class="acoes"><button class="botao" id="copiar-pix">Copiar o código</button></div>
+          <p class="rodape-nota">
+            Abra o aplicativo do seu banco, escolha <b>Pix copia e cola</b> e cole este código.
+            ${compra.pixExpiraEm ? `O código vale até ${horaCurta(compra.pixExpiraEm)}.` : ''}
+          </p>`
+        : `
+          <div class="faixa alerta"><div>
+            O código ainda está sendo gerado pelo banco. Aguarde alguns instantes e atualize.
+          </div></div>`}
+        <p class="rodape-nota" id="pix-estado">Aguardando o pagamento…</p>
+        <div class="acoes"><button class="botao secundario" id="pix-fechar">Pago depois</button></div>`}
+    `);
+
+    const el = document.querySelector('.folha');
+
+    el.querySelector('#copiar-pix')?.addEventListener('click', async (e) => {
+      try {
+        await navigator.clipboard.writeText(copiaECola);
+        e.target.textContent = 'Código copiado';
+        setTimeout(() => { e.target.textContent = 'Copiar o código'; }, 2500);
+      } catch {
+        // Sem permissão para a área de transferência: o código está na tela.
+        avisar('Selecione o código acima e copie');
+      }
+    });
+
+    el.querySelector('#pix-fechar')?.addEventListener('click', () => {
+      parar = true;
+      fecharFolha();
+      estado.contrato = null;
+      irPara('contrato');
+    });
+
+    el.querySelector('#ir-contrato')?.addEventListener('click', () => {
+      parar = true;
+      fecharFolha();
+      estado.contrato = null;
+      irPara('contrato');
+    });
+  };
+
+  const perguntar = async () => {
+    if (parar) return;
+    try {
+      const s = await chamar(`/convites/${compra.compraId}/pix`);
+      if (s && s.pago) { parar = true; return desenhar(s); }
+    } catch { /* uma falha de rede não tira o código da tela */ }
+    if (!parar) setTimeout(perguntar, 5000);
+  };
+
+  desenhar(null);
+  setTimeout(perguntar, 5000);
+}
+
+async function telaConvites() {
+  abrirFolha('<div class="vazio">Carregando…</div>');
+  let oferta;
+  try { oferta = await chamar('/convites'); }
+  catch { return abrirFolha('<div class="vazio">Não foi possível abrir os convites agora.</div>'); }
+
+  const escolhido = {};   // chave da festa -> quantidade (só as marcadas entram)
+  // Nasce no Pix: é a forma sem taxa para ele. O cartão fica ao lado, para
+  // quem quiser parcelar sabendo que a operadora cobra por isso.
+  let forma = 'pix';
+  let parcelasCartao = 1;
+  let previa = null;
+
+  const brlx = (v) => brl(Number(v || 0));
+  const marcada = (c) => Object.prototype.hasOwnProperty.call(escolhido, c);
+
+  const desenhar = () => {
+    // Festa sem preço cadastrado não é oferecida: vender a R$ 0 seria dar de graça.
+    const disponiveis = oferta.festas.filter((f) => f.unitario !== null);
+    const aVenda = disponiveis.filter((f) => f.podeComprar);
+
+    abrirFolha(`
+      <h2>Convites <em>extras</em></h2>
+      <div class="sub">Escolha as festas, a quantidade e como pagar. O aditivo é assinado por e-mail.</div>
+
+      ${oferta.bloqueio && !(oferta.pendenciasDeCadastro || []).length
+        ? `<div class="faixa alerta"><div>${escapar(oferta.bloqueio)}</div></div>` : ''}
+
+      ${(oferta.pendenciasDeCadastro || []).length ? `
+        <div class="faixa alerta" style="margin-bottom:12px"><div>
+          <b>Complete seus dados antes de comprar.</b>
+          ${oferta.pendenciasDeCadastro.map((p) => `<br>· <b>${escapar(p.rotulo)}</b>: ${escapar(p.detalhe)}`).join('')}
+          <br><button class="link-inline" id="ir-dados">Atualizar meus dados</button>
+        </div></div>` : ''}
+
+      ${aVenda.length ? `
+        <div class="secao-titulo">Para quais festas</div>
+        <div class="festas-escolha">
+          ${aVenda.map((f) => `
+            <button type="button" class="festa-chip ${marcada(f.chave) ? 'ativo' : ''}" data-marcar="${f.chave}">
+              <span class="nome">${escapar(f.rotulo)}</span>
+              <span class="preco">${brlx(f.unitario)}</span>
+            </button>`).join('')}
+        </div>
+
+        ${aVenda.filter((f) => marcada(f.chave)).map((f) => `
+          <div class="convite-item">
+            <div class="convite-cab">
+              <div>
+                <b>${escapar(f.rotulo)}</b>
+                ${/* O nome que a equipe deu ao evento: numa festa que reúne
+                     várias turmas, é o que diz de qual festa se trata. */ ''}
+                ${f.evento && f.evento.nome ? `<span class="convite-sub">${escapar(f.evento.nome)}</span>` : ''}
+                <span class="convite-sub">${f.data ? `festa em ${dataCurta(f.data)}` : 'data a definir'}${f.lotacao && f.lotacao.vagas != null ? ` · ${f.lotacao.vagas} lugares` : ''}${f.inclusos != null ? ` · ${f.inclusos} no pacote` : ''}</span>
+              </div>
+              <div class="passo">
+                <button type="button" class="passo-btn" data-menos="${f.chave}" aria-label="Menos um">−</button>
+                <span class="passo-qtd">${escolhido[f.chave] || 0}</span>
+                <button type="button" class="passo-btn" data-mais="${f.chave}" aria-label="Mais um">+</button>
+                <button type="button" class="passo-lixo" data-remover="${f.chave}" aria-label="Remover ${escapar(f.rotulo)}">${ICONES.lixeira || '×'}</button>
+              </div>
+            </div>
+            <div class="convite-linha-valor">
+              <span>${escolhido[f.chave] || 0} × ${brlx(f.unitario)}</span>
+              <b>${brlx((escolhido[f.chave] || 0) * f.unitario)}</b>
+            </div>
+            ${!f.formas.boleto && f.motivo ? `<p class="rodape-nota" style="margin:6px 0 0">${escapar(f.motivo)}</p>` : ''}
+          </div>`).join('')}
+        ` : ''}
+
+      ${/* DUAS AUSÊNCIAS DIFERENTES, e confundi-las manda o formando falar com
+            quem não pode resolver. Sem festa nenhuma na lista, a turma ainda
+            não tem evento cadastrado: não há o que vender e nem data para
+            esperar. Com festa e sem preço, a festa existe e o que falta é o
+            preço do convite — aí vale pedir para a equipe. */ ''}
+      ${!oferta.festas.length
+        ? `<div class="vazio">As festas da sua turma ainda não foram cadastradas.<br>
+             Quando a equipe marcar onde e quando cada festa acontece, os convites extras aparecem aqui.</div>`
+        : !disponiveis.length
+          ? '<div class="vazio">Esta turma ainda não tem convites extras à venda.</div>'
+          : ''}
+
+      ${previa ? `
+        <div class="secao-titulo">Como fica</div>
+        <div class="cartao resumo-compra">
+          ${previa.linhas.map((l) => `<div class="dado"><span>${l.quantidade}× ${escapar(l.rotulo)}</span><b>${brlx(l.total)}</b></div>`).join('')}
+          <div class="dado total"><span>Convites</span><b class="destaque-valor">${brlx(previa.valorConvites)}</b></div>
+
+          ${/* O QUE MOSTRAR SEGUE A ESCOLHA DELE, não o que a conta devolveu:
+               para o backend, Pix e cartão à vista são o mesmo cálculo. */ ''}
+          ${forma === 'pix' ? `
+            <p class="rodape-nota" style="margin:12px 0 8px">
+              No Pix você paga <b>o valor dos convites</b>, sem taxa nenhuma. O código aparece na próxima tela.
+            </p>
+            <div class="dado"><span>Total no Pix</span><b class="destaque-valor">${brlx(previa.valorConvites)}</b></div>`
+          : previa.forma === 'boleto' ? `
+            <p class="rodape-nota" style="margin:12px 0 8px">
+              Somado às suas próximas parcelas, <b>sem taxa</b>.
+              ${previa.parcelas.length === 1
+                ? 'Entra toda na parcela abaixo, porque é a única que vence antes da festa.'
+                : `Dividido em ${previa.parcelas.length} parcelas — as que vencem antes da festa.`}
+              ${balaoAjuda(
+                'Como ler esta lista',
+                'O valor menor é a sua mensalidade de hoje, a do contrato da formatura. '
+                + 'O valor maior, à direita, é quanto aquela parcela passa a custar: a mensalidade '
+                + 'mais a parte dos convites e a taxa por boleto. Nenhuma parcela já vencida ou paga é alterada.',
+              )}
+            </p>
+            ${previa.parcelas.map((p) => `
+              <div class="dado parcela-muda">
+                <span>${dataCurta(p.vencimento)}<small>mensalidade de hoje: ${brlx(p.valorAtual)}</small></span>
+                <b>${brlx(p.valorAtual + p.acrescimo + (previa.taxaAdm || 0))}</b>
+              </div>`).join('')}
+            ${previa.taxaAdm ? `<p class="rodape-nota" style="margin-top:8px">Os valores já incluem a taxa de ${brlx(previa.taxaAdm)} por boleto, que você já paga hoje.</p>` : ''}`
+          : `
+            <p class="rodape-nota" style="margin:12px 0 8px">
+              No cartão, a <b>operadora do cartão</b> cobra taxa de utilização e juros do parcelamento.
+              Esse acréscimo não é do Indaiá.
+            </p>
+            <div class="dado"><span>${previa.cartao.escolhida.parcelas}× no cartão</span><b class="destaque-valor">${brlx(previa.cartao.escolhida.valorTotal)}</b></div>
+            <div class="dado"><span>Taxas e juros do banco</span><b>${brlx(previa.cartao.escolhida.acrescimo)}</b></div>`}
+        </div>` : ''}
+
+      ${/* SÓ CARTÃO desde 15/10/2026: o convite comprado depois da adesão se
+           paga na hora. Quem quer parcelar junto com o pacote compra na
+           adesão. A caixa de escolha some — uma opção só não se escolhe. */ ''}
+      ${aVenda.length ? `
+        <div class="secao-titulo">Como pagar</div>
+        <div class="formas-pag" id="formas">
+          <div class="forma-opcao ${forma === 'pix' ? 'ativo' : ''}">
+            <button type="button" data-forma="pix" class="${forma === 'pix' ? 'ativo' : ''}">Pix</button>
+            ${balaoPagamento('pix')}
+          </div>
+          <div class="forma-opcao ${forma === 'cartao' ? 'ativo' : ''}">
+            <button type="button" data-forma="cartao" class="${forma === 'cartao' ? 'ativo' : ''}">Cartão de crédito</button>
+            ${balaoPagamento('cartao')}
+          </div>
+        </div>
+        ${forma === 'cartao' && previa && previa.forma === 'cartao' ? `
+          <div class="campo">
+            <label for="parcelas">Em quantas vezes</label>
+            <select id="parcelas">
+              ${previa.cartao.opcoes.map((o) => `<option value="${o.parcelas}" ${o.parcelas === parcelasCartao ? 'selected' : ''}>${o.parcelas}× de ${brlx(o.valorParcela)} — total ${brlx(o.valorTotal)}</option>`).join('')}
+            </select>
+          </div>` : ''}
+        ${/* NÃO HÁ DESISTIR depois daqui (decisão do Dani, 14/10): ele segue
+              com o aditivo. Então o compromisso precisa estar escrito antes do
+              botão, junto do valor — não escondido numa cláusula. */ ''}
+        ${previa && forma ? `
+          <p class="rodape-nota" style="margin:12px 0 0">
+            Ao confirmar, você ${forma === 'pix' ? 'paga por Pix e assina' : 'paga no cartão e assina'} o aditivo
+            de <b>${brlx(previa.valorConvites)}</b> em convites${forma === 'cartao' ? ` (<b>${brlx(previa.cartao.escolhida.valorTotal)}</b> com as taxas do banco)` : ''}.
+            A compra passa a fazer parte do seu contrato e não é desfeita pelo portal.
+          </p>` : ''}
+        <div class="acoes dupla">
+          <button class="botao" id="comprar" ${previa && forma ? '' : 'disabled'}>${forma === 'pix' ? 'Pagar com Pix' : 'Ir para o pagamento'}</button>
+          <button class="botao secundario" data-fechar-folha>Cancelar</button>
+        </div>` : '<div class="acoes"><button class="botao secundario" data-fechar-folha>Fechar</button></div>'}
+    `, ligar);
+  };
+
+  const itensEscolhidos = () =>
+    Object.entries(escolhido)
+      .filter(([, q]) => Number(q) > 0)
+      .map(([festa, quantidade]) => ({ festa, quantidade: Number(quantidade) }));
+
+  const recalcular = async () => {
+    const itens = itensEscolhidos();
+    if (!itens.length || !forma) { previa = null; return desenhar(); }
+    try {
+      previa = await chamar('/convites/simular', { method: 'POST', body: JSON.stringify({ itens, forma, parcelasCartao }) });
+    } catch (e) {
+      previa = null;
+      avisar((e && e.corpo && (e.corpo.message || e.corpo.erro)) || 'Não foi possível calcular agora');
+    }
+    desenhar();
+  };
+
+  /** Quantos ainda cabem desta festa, para o "+" não passar da lotação. */
+  const teto = (chave) => {
+    const f = oferta.festas.find((x) => x.chave === chave);
+    return f && f.disponivel != null ? f.disponivel : 20;
+  };
+
+  function ligar(el) {
+    el.querySelector('#ir-dados')?.addEventListener('click', () => { fecharFolha(); telaMeusDados(); });
+
+    // marcar/desmarcar a festa: só a marcada ganha seletor de quantidade
+    el.querySelectorAll('[data-marcar]').forEach((b) => b.addEventListener('click', () => {
+      const c = b.dataset.marcar;
+      if (marcada(c)) delete escolhido[c];
+      else escolhido[c] = 1;
+      recalcular();
+    }));
+
+    el.querySelectorAll('[data-mais]').forEach((b) => b.addEventListener('click', () => {
+      const c = b.dataset.mais;
+      escolhido[c] = Math.min(teto(c), (escolhido[c] || 0) + 1);
+      recalcular();
+    }));
+
+    el.querySelectorAll('[data-menos]').forEach((b) => b.addEventListener('click', () => {
+      const c = b.dataset.menos;
+      const novo = (escolhido[c] || 0) - 1;
+      // chegou a zero: a festa sai da lista, como se tivesse sido removida
+      if (novo <= 0) delete escolhido[c];
+      else escolhido[c] = novo;
+      recalcular();
+    }));
+
+    el.querySelectorAll('[data-remover]').forEach((b) => b.addEventListener('click', () => {
+      delete escolhido[b.dataset.remover];
+      recalcular();
+    }));
+
+    el.querySelectorAll('#formas [data-forma]').forEach((b) => b.addEventListener('click', (ev) => {
+      // o "?" dentro do botão abre o balão, não troca a forma
+      if (ev.target.closest('.cita')) return;
+      forma = b.dataset.forma;
+      parcelasCartao = 1;
+      recalcular();
+    }));
+
+    el.querySelector('#parcelas')?.addEventListener('change', (e) => {
+      parcelasCartao = Number(e.target.value) || 1;
+      recalcular();
+    });
+
+    el.querySelector('#comprar')?.addEventListener('click', async (e) => {
+      const itens = itensEscolhidos();
+      if (!itens.length || !forma) return;
+      e.target.disabled = true;
+      e.target.textContent = 'Abrindo…';
+      try {
+        const r = await chamar('/convites/comprar', { method: 'POST', body: JSON.stringify({ itens, forma, parcelasCartao }) });
+
+        // NO PIX A TELA NÃO SAI DAQUI: o código tem de ficar na frente dele
+        // para copiar. Mandá-lo para outra tela com um QR Code vivo seria
+        // pedir que ele voltasse atrás para pagar.
+        if (r.forma === 'pix') return telaPixDoConvite(r);
+
+        // No cartão o link é do PAGAMENTO: ele paga primeiro e assina depois.
+        if (r.url) window.open(r.url, '_blank', 'noopener');
+        avisar(r.forma === 'cartao' ? 'Abrimos o pagamento no cartão' : 'Abrimos o aditivo para você assinar');
+        // Volta para o Contrato, que é onde a compra aparece com o link para
+        // assinar — inclusive se o bloqueador de pop-up engolir a aba nova.
+        fecharFolha();
+        estado.contrato = null;   // força reler, para a compra nova já aparecer
+        irPara('contrato');
+      } catch (err) {
+        e.target.disabled = false;
+        e.target.textContent = forma === 'pix' ? 'Pagar com Pix' : 'Ir para o pagamento';
+        avisar((err && err.corpo && (err.corpo.message || err.corpo.erro)) || 'Não foi possível concluir agora');
+      }
+    });
+  }
+
+  desenhar();
 }
 
 // ---------- aba: minha turma -------------------------------------------------
