@@ -2928,8 +2928,7 @@ async function telaNomearConvidados() {
       }).join('')}
 
       <p class="rodape-nota">
-        Pode preencher aos poucos: salve o que já souber e volte depois. Convite sem nome continua valendo —
-        só vai dar mais trabalho na portaria no dia.
+        Pode preencher aos poucos: salve o que já souber e volte até a data limite para nomear o que falta ou alterar.
       </p>
     `);
 
@@ -2988,13 +2987,6 @@ async function telaNomearConvidados() {
 
 /** Explicação de cada forma de pagamento, no balão do "?". */
 const AJUDA_PAGAMENTO = {
-  boleto: {
-    titulo: 'Nas suas parcelas',
-    texto:
-      'O valor dos convites é somado às suas próximas parcelas, sem taxa nenhuma. '
-      + 'O parcelamento vai só até a data da festa: o convite precisa estar pago antes de você usá-lo. '
-      + 'Parcelas já vencidas ou pagas não são alteradas.',
-  },
   cartao: {
     titulo: 'Cartão de crédito',
     texto:
@@ -3080,7 +3072,9 @@ async function telaConvites() {
   catch { return abrirFolha('<div class="vazio">Não foi possível abrir os convites agora.</div>'); }
 
   const escolhido = {};   // chave da festa -> quantidade (só as marcadas entram)
-  let forma = null;       // 'boleto' | 'cartao'
+  // Já nasce no cartão: desde 15/10/2026 é a única forma pelo portal, e
+  // deixar sem escolha obrigaria um clique que não decide nada.
+  let forma = 'cartao';
   let parcelasCartao = 1;
   let previa = null;
 
@@ -3174,15 +3168,14 @@ async function telaConvites() {
             <div class="dado"><span>Taxas e juros do banco</span><b>${brlx(previa.cartao.escolhida.acrescimo)}</b></div>`}
         </div>` : ''}
 
+      ${/* SÓ CARTÃO desde 15/10/2026: o convite comprado depois da adesão se
+           paga na hora. Quem quer parcelar junto com o pacote compra na
+           adesão. A caixa de escolha some — uma opção só não se escolhe. */ ''}
       ${aVenda.length ? `
         <div class="secao-titulo">Como pagar</div>
         <div class="formas-pag" id="formas">
-          <div class="forma-opcao ${forma === 'boleto' ? 'ativo' : ''}">
-            <button type="button" data-forma="boleto" class="${forma === 'boleto' ? 'ativo' : ''}">Nas minhas parcelas</button>
-            ${balaoPagamento('boleto')}
-          </div>
-          <div class="forma-opcao ${forma === 'cartao' ? 'ativo' : ''}">
-            <button type="button" data-forma="cartao" class="${forma === 'cartao' ? 'ativo' : ''}">Cartão de crédito</button>
+          <div class="forma-opcao ativo">
+            <button type="button" data-forma="cartao" class="ativo">Cartão de crédito</button>
             ${balaoPagamento('cartao')}
           </div>
         </div>
