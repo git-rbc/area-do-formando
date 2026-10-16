@@ -3208,6 +3208,9 @@ async function telaConvites() {
             <div class="convite-cab">
               <div>
                 <b>${escapar(f.rotulo)}</b>
+                ${/* O nome que a equipe deu ao evento: numa festa que reúne
+                     várias turmas, é o que diz de qual festa se trata. */ ''}
+                ${f.evento && f.evento.nome ? `<span class="convite-sub">${escapar(f.evento.nome)}</span>` : ''}
                 <span class="convite-sub">${f.data ? `festa em ${dataCurta(f.data)}` : 'data a definir'}${f.lotacao && f.lotacao.vagas != null ? ` · ${f.lotacao.vagas} lugares` : ''}${f.inclusos != null ? ` · ${f.inclusos} no pacote` : ''}</span>
               </div>
               <div class="passo">
@@ -3225,7 +3228,17 @@ async function telaConvites() {
           </div>`).join('')}
         ` : ''}
 
-      ${!disponiveis.length ? '<div class="vazio">Esta turma ainda não tem convites extras à venda.</div>' : ''}
+      ${/* DUAS AUSÊNCIAS DIFERENTES, e confundi-las manda o formando falar com
+            quem não pode resolver. Sem festa nenhuma na lista, a turma ainda
+            não tem evento cadastrado: não há o que vender e nem data para
+            esperar. Com festa e sem preço, a festa existe e o que falta é o
+            preço do convite — aí vale pedir para a equipe. */ ''}
+      ${!oferta.festas.length
+        ? `<div class="vazio">As festas da sua turma ainda não foram cadastradas.<br>
+             Quando a equipe marcar onde e quando cada festa acontece, os convites extras aparecem aqui.</div>`
+        : !disponiveis.length
+          ? '<div class="vazio">Esta turma ainda não tem convites extras à venda.</div>'
+          : ''}
 
       ${previa ? `
         <div class="secao-titulo">Como fica</div>
