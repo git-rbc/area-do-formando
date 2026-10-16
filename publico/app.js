@@ -44,6 +44,8 @@ const esquecer = () => { try { sessionStorage.removeItem('formando_token'); } ca
 const brl = (v) => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dataCurta = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
 const dataLonga = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
+/** A hora de um instante completo (ISO), para "o código vale até 14:35". */
+const horaCurta = (iso) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
 const mesAno = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '—';
 const escapar = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -2987,6 +2989,13 @@ async function telaNomearConvidados() {
 
 /** Explicação de cada forma de pagamento, no balão do "?". */
 const AJUDA_PAGAMENTO = {
+  pix: {
+    titulo: 'Pix',
+    texto:
+      'Você paga na hora, sem taxa nenhuma: o valor é o dos convites. '
+      + 'Assim que o pagamento cair, abrimos o aditivo para você assinar. '
+      + 'O código vale por alguns minutos — se expirar, é só gerar outro.',
+  },
   cartao: {
     titulo: 'Cartão de crédito',
     texto:
@@ -3065,6 +3074,90 @@ function blocoDasCompras(historico) {
   `;
 }
 
+/**
+ * O PIX DO CONVITE (16/10/2026).
+ *
+ * O código fica na frente dele até o pagamento cair. A tela pergunta sozinha,
+ * de poucos em poucos segundos — perguntar é barato e a alternativa é o
+ * formando ficar recarregando a página para saber se deu certo.
+ *
+ * Quem confirma o pagamento é o banco, não esta tela: aqui só se mostra o que
+ * já aconteceu. Quando cair, o aditivo é aberto automaticamente e ele vai
+ * assinar.
+ */
+function telaPixDoConvite(compra) {
+  let parar = false;
+  const copiaECola = compra.pixCopiaECola || '';
+
+  const desenhar = (situacao) => {
+    const pago = situacao && situacao.pago;
+    abrirFolha(`
+      <h2>Pague com <em>Pix</em></h2>
+      <div class="sub">${brl(Number(compra.valor || 0))} em convites. Assim que o pagamento cair, abrimos o aditivo para você assinar.</div>
+
+      ${pago ? `
+        <div class="faixa"><div>
+          <b>Pagamento confirmado.</b><br>
+          Estamos preparando seu aditivo — ele aparece em <b>Contrato</b>, em "Seus convites", para você assinar.
+        </div></div>
+        <div class="acoes"><button class="botao" id="ir-contrato">Ver em Contrato</button></div>`
+      : `
+        ${copiaECola ? `
+          <div class="pix-codigo" id="pix-codigo">${escapar(copiaECola)}</div>
+          <div class="acoes"><button class="botao" id="copiar-pix">Copiar o código</button></div>
+          <p class="rodape-nota">
+            Abra o aplicativo do seu banco, escolha <b>Pix copia e cola</b> e cole este código.
+            ${compra.pixExpiraEm ? `O código vale até ${horaCurta(compra.pixExpiraEm)}.` : ''}
+          </p>`
+        : `
+          <div class="faixa alerta"><div>
+            O código ainda está sendo gerado pelo banco. Aguarde alguns instantes e atualize.
+          </div></div>`}
+        <p class="rodape-nota" id="pix-estado">Aguardando o pagamento…</p>
+        <div class="acoes"><button class="botao secundario" id="pix-fechar">Pago depois</button></div>`}
+    `);
+
+    const el = document.querySelector('.folha');
+
+    el.querySelector('#copiar-pix')?.addEventListener('click', async (e) => {
+      try {
+        await navigator.clipboard.writeText(copiaECola);
+        e.target.textContent = 'Código copiado';
+        setTimeout(() => { e.target.textContent = 'Copiar o código'; }, 2500);
+      } catch {
+        // Sem permissão para a área de transferência: o código está na tela.
+        avisar('Selecione o código acima e copie');
+      }
+    });
+
+    el.querySelector('#pix-fechar')?.addEventListener('click', () => {
+      parar = true;
+      fecharFolha();
+      estado.contrato = null;
+      irPara('contrato');
+    });
+
+    el.querySelector('#ir-contrato')?.addEventListener('click', () => {
+      parar = true;
+      fecharFolha();
+      estado.contrato = null;
+      irPara('contrato');
+    });
+  };
+
+  const perguntar = async () => {
+    if (parar) return;
+    try {
+      const s = await chamar(`/convites/${compra.compraId}/pix`);
+      if (s && s.pago) { parar = true; return desenhar(s); }
+    } catch { /* uma falha de rede não tira o código da tela */ }
+    if (!parar) setTimeout(perguntar, 5000);
+  };
+
+  desenhar(null);
+  setTimeout(perguntar, 5000);
+}
+
 async function telaConvites() {
   abrirFolha('<div class="vazio">Carregando…</div>');
   let oferta;
@@ -3072,9 +3165,9 @@ async function telaConvites() {
   catch { return abrirFolha('<div class="vazio">Não foi possível abrir os convites agora.</div>'); }
 
   const escolhido = {};   // chave da festa -> quantidade (só as marcadas entram)
-  // Já nasce no cartão: desde 15/10/2026 é a única forma pelo portal, e
-  // deixar sem escolha obrigaria um clique que não decide nada.
-  let forma = 'cartao';
+  // Nasce no Pix: é a forma sem taxa para ele. O cartão fica ao lado, para
+  // quem quiser parcelar sabendo que a operadora cobra por isso.
+  let forma = 'pix';
   let parcelasCartao = 1;
   let previa = null;
 
@@ -3140,7 +3233,14 @@ async function telaConvites() {
           ${previa.linhas.map((l) => `<div class="dado"><span>${l.quantidade}× ${escapar(l.rotulo)}</span><b>${brlx(l.total)}</b></div>`).join('')}
           <div class="dado total"><span>Convites</span><b class="destaque-valor">${brlx(previa.valorConvites)}</b></div>
 
-          ${previa.forma === 'boleto' ? `
+          ${/* O QUE MOSTRAR SEGUE A ESCOLHA DELE, não o que a conta devolveu:
+               para o backend, Pix e cartão à vista são o mesmo cálculo. */ ''}
+          ${forma === 'pix' ? `
+            <p class="rodape-nota" style="margin:12px 0 8px">
+              No Pix você paga <b>o valor dos convites</b>, sem taxa nenhuma. O código aparece na próxima tela.
+            </p>
+            <div class="dado"><span>Total no Pix</span><b class="destaque-valor">${brlx(previa.valorConvites)}</b></div>`
+          : previa.forma === 'boleto' ? `
             <p class="rodape-nota" style="margin:12px 0 8px">
               Somado às suas próximas parcelas, <b>sem taxa</b>.
               ${previa.parcelas.length === 1
@@ -3174,8 +3274,12 @@ async function telaConvites() {
       ${aVenda.length ? `
         <div class="secao-titulo">Como pagar</div>
         <div class="formas-pag" id="formas">
-          <div class="forma-opcao ativo">
-            <button type="button" data-forma="cartao" class="ativo">Cartão de crédito</button>
+          <div class="forma-opcao ${forma === 'pix' ? 'ativo' : ''}">
+            <button type="button" data-forma="pix" class="${forma === 'pix' ? 'ativo' : ''}">Pix</button>
+            ${balaoPagamento('pix')}
+          </div>
+          <div class="forma-opcao ${forma === 'cartao' ? 'ativo' : ''}">
+            <button type="button" data-forma="cartao" class="${forma === 'cartao' ? 'ativo' : ''}">Cartão de crédito</button>
             ${balaoPagamento('cartao')}
           </div>
         </div>
@@ -3191,12 +3295,12 @@ async function telaConvites() {
               botão, junto do valor — não escondido numa cláusula. */ ''}
         ${previa && forma ? `
           <p class="rodape-nota" style="margin:12px 0 0">
-            Ao confirmar, você ${forma === 'cartao' ? 'paga no cartão e assina' : 'assina'} o aditivo
+            Ao confirmar, você ${forma === 'pix' ? 'paga por Pix e assina' : 'paga no cartão e assina'} o aditivo
             de <b>${brlx(previa.valorConvites)}</b> em convites${forma === 'cartao' ? ` (<b>${brlx(previa.cartao.escolhida.valorTotal)}</b> com as taxas do banco)` : ''}.
             A compra passa a fazer parte do seu contrato e não é desfeita pelo portal.
           </p>` : ''}
         <div class="acoes dupla">
-          <button class="botao" id="comprar" ${previa && forma ? '' : 'disabled'}>${forma === 'cartao' ? 'Ir para o pagamento' : 'Comprar e assinar'}</button>
+          <button class="botao" id="comprar" ${previa && forma ? '' : 'disabled'}>${forma === 'pix' ? 'Pagar com Pix' : 'Ir para o pagamento'}</button>
           <button class="botao secundario" data-fechar-folha>Cancelar</button>
         </div>` : '<div class="acoes"><button class="botao secundario" data-fechar-folha>Fechar</button></div>'}
     `, ligar);
@@ -3276,8 +3380,13 @@ async function telaConvites() {
       e.target.textContent = 'Abrindo…';
       try {
         const r = await chamar('/convites/comprar', { method: 'POST', body: JSON.stringify({ itens, forma, parcelasCartao }) });
-        // No boleto o link é da ASSINATURA; no cartão, do PAGAMENTO — lá ele
-        // paga primeiro e assina depois.
+
+        // NO PIX A TELA NÃO SAI DAQUI: o código tem de ficar na frente dele
+        // para copiar. Mandá-lo para outra tela com um QR Code vivo seria
+        // pedir que ele voltasse atrás para pagar.
+        if (r.forma === 'pix') return telaPixDoConvite(r);
+
+        // No cartão o link é do PAGAMENTO: ele paga primeiro e assina depois.
         if (r.url) window.open(r.url, '_blank', 'noopener');
         avisar(r.forma === 'cartao' ? 'Abrimos o pagamento no cartão' : 'Abrimos o aditivo para você assinar');
         // Volta para o Contrato, que é onde a compra aparece com o link para
@@ -3287,7 +3396,7 @@ async function telaConvites() {
         irPara('contrato');
       } catch (err) {
         e.target.disabled = false;
-        e.target.textContent = forma === 'cartao' ? 'Ir para o pagamento' : 'Comprar e assinar';
+        e.target.textContent = forma === 'pix' ? 'Pagar com Pix' : 'Ir para o pagamento';
         avisar((err && err.corpo && (err.corpo.message || err.corpo.erro)) || 'Não foi possível concluir agora');
       }
     });

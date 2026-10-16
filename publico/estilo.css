@@ -1158,3 +1158,14 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
   .nome-convidado input:first-of-type { grid-column: 2; }
   .nome-convidado input + input { grid-column: 2; }
 }
+
+/* O CÓDIGO DO PIX (16/10/2026): feito para ser copiado, não lido. Monoespaçado
+   e quebrando em qualquer ponto, porque é uma linha longa sem espaços; e
+   selecionável de uma vez para quem copiar à mão. */
+.pix-codigo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px; line-height: 1.5; word-break: break-all; user-select: all;
+  border: 1px solid var(--linha); border-radius: 10px;
+  padding: 12px; margin: 4px 0 10px; background: var(--papel);
+  max-height: 150px; overflow-y: auto;
+}

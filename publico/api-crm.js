@@ -534,6 +534,8 @@
     if (caminho === '/convites/simular' && metodo === 'POST') return pedir('POST', '/convites/simular', corpo || {}, token);
     if (caminho === '/convites/comprar' && metodo === 'POST') return pedir('POST', '/convites/comprar', corpo || {}, token);
     // Quem entra com cada convite. O prazo (15 dias antes da festa) é do CRM.
+    // "o Pix já caiu?" — a tela pergunta enquanto o código está na frente dele.
+    if (metodo === 'GET' && /^\/convites\/[\w-]+\/pix$/.test(caminho)) return pedir('GET', caminho, null, token);
     if (caminho === '/convites/nomes' && metodo === 'GET') return pedir('GET', '/convites/nomes', null, token);
     if (metodo === 'PUT' && /^\/convites\/nomes\/[\w-]+$/.test(caminho)) return pedir('PUT', caminho, corpo || {}, token);
 
