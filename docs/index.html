@@ -2249,6 +2249,18 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
   const dataBR = (iso) => (iso ? String(iso).slice(0, 10) : null);
 
   /**
+   * Os convites que ele tem, tirados da lista do que está à venda.
+   *
+   * SÓ PARA A JANELA DE DEPLOY: desde 19/10/2026 a API manda `meusConvites`
+   * pronto, e é ele que vale. Enquanto a versão em produção não tiver o campo,
+   * isto devolve o que dá — o que está à venda e ele já possui. Em turma sem
+   * evento cadastrado vem vazio, que é justamente o defeito corrigido; some
+   * esta função quando a API nova estiver no ar há tempo.
+   */
+  const meusConvitesDasFestas = (festas) =>
+    (festas || []).filter((f) => (f.inclusos || 0) > 0 || (f.jaComprados || 0) > 0);
+
+  /**
    * O comprovante no CRM não tem status: a equipe só consulta, não aprova
    * (decisão de 25/09). Para o FORMANDO, porém, um comprovante anexado está
    * esperando a baixa — que é o que a tela dele chama de "em análise". Traduzir
@@ -2662,10 +2674,14 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
           taxaBoleto: resumo.taxaBoleto || 0,
         },
         // Quantos convites ele tem em cada festa: os do pacote mais os extras
-        // que comprou. `nomeados` fica fora — o CRM não cadastra nome de
-        // convidado (ver API_RECURSOS.convites).
-        convites: festas
-          .filter((f) => (f.inclusos || 0) > 0 || (f.jaComprados || 0) > 0)
+        // que comprou.
+        //
+        // VEM DE `meusConvites`, NÃO DE `festas` (19/10/2026): `festas` é o que
+        // está à venda, e desde 16/10 só entra ali a festa com evento
+        // cadastrado. Lendo dali, o formando de turma sem evento parava de ver
+        // convites que já tinha pago. O `||` cobre a janela em que a API em
+        // produção ainda não manda o campo novo.
+        convites: (oferta?.meusConvites ?? meusConvitesDasFestas(festas))
           .map((f) => ({
             tipo: f.rotulo,
             quantidade: (f.inclusos || 0) + (f.jaComprados || 0),
