@@ -2178,6 +2178,38 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
 
   const url = (caminho) => `${String(BASE).replace(/\/$/, '')}${caminho}`;
 
+  /**
+   * O TOKEN DO LINK DA EQUIPE (19/10/2026).
+   *
+   * A compra de convite fecha 7 dias antes da festa. Quando a equipe libera
+   * alguém depois disso, manda um link com `?convite=…`; enquanto ele vale, a
+   * compra daquela festa abre de novo para quem o recebeu.
+   *
+   * Guardado em `sessionStorage` porque o portal é uma página só e o endereço é
+   * limpo logo depois: o token não fica na barra para ser copiado por cima do
+   * ombro, nem vai parar no histórico compartilhado do computador da casa. Some
+   * quando a aba fecha, que é a vida útil de uma compra.
+   */
+  const CHAVE_LIBERACAO = 'area-formando:liberacao';
+
+  function guardarLiberacaoDaUrl() {
+    try {
+      const naUrl = new URLSearchParams(location.search).get('convite');
+      if (!naUrl) return;
+      sessionStorage.setItem(CHAVE_LIBERACAO, naUrl);
+      // Tira o token da barra sem recarregar nem perder o resto do endereço.
+      const limpo = new URL(location.href);
+      limpo.searchParams.delete('convite');
+      history.replaceState(null, '', limpo.pathname + limpo.search + limpo.hash);
+    } catch { /* sem sessionStorage (aba anônima travada), segue sem liberação */ }
+  }
+
+  function liberacao() {
+    try { return sessionStorage.getItem(CHAVE_LIBERACAO) || null; } catch { return null; }
+  }
+
+  guardarLiberacaoDaUrl();
+
   /** O CRM responde { success, data } — o app espera o conteúdo direto. */
   async function pedir(metodo, caminho, corpo, token) {
     const r = await fetch(url(caminho), {
@@ -2702,10 +2734,20 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
     // ── convites extras ──────────────────────────────────────────────────────
     // Compra de convite depois da adesão (14/10/2026). O CRM é quem sabe preço,
     // lotação, prazo e forma de pagamento — o portal só desenha o que vier.
-    if (caminho === '/convites' && metodo === 'GET') return pedir('GET', '/convites', null, token);
+    // A liberação da equipe viaja em toda a conversa da compra: na oferta
+    // ela diz quais festas reabrem; na simulação e na compra, é o que
+    // autoriza passar do prazo.
+    if (caminho === '/convites' && metodo === 'GET') {
+      const lib = liberacao();
+      return pedir('GET', lib ? ('/convites?liberacao=' + encodeURIComponent(lib)) : '/convites', null, token);
+    }
     if (caminho === '/convites/historico' && metodo === 'GET') return pedir('GET', '/convites/historico', null, token);
-    if (caminho === '/convites/simular' && metodo === 'POST') return pedir('POST', '/convites/simular', corpo || {}, token);
-    if (caminho === '/convites/comprar' && metodo === 'POST') return pedir('POST', '/convites/comprar', corpo || {}, token);
+    if (caminho === '/convites/simular' && metodo === 'POST') {
+      return pedir('POST', '/convites/simular', { ...(corpo || {}), liberacao: liberacao() }, token);
+    }
+    if (caminho === '/convites/comprar' && metodo === 'POST') {
+      return pedir('POST', '/convites/comprar', { ...(corpo || {}), liberacao: liberacao() }, token);
+    }
     // Quem entra com cada convite. O prazo (15 dias antes da festa) é do CRM.
     // "o Pix já caiu?" — a tela pergunta enquanto o código está na frente dele.
     if (metodo === 'GET' && /^\/convites\/[\w-]+\/pix$/.test(caminho)) return pedir('GET', caminho, null, token);
@@ -6031,6 +6073,16 @@ async function telaConvites() {
     abrirFolha(`
       <h2>Convites <em>extras</em></h2>
       <div class="sub">Escolha as festas, a quantidade e como pagar. O aditivo é assinado por e-mail.</div>
+
+      ${/* A LIBERAÇÃO PRECISA APARECER. Ele chegou aqui por um link que a
+            equipe mandou para ele, depois de o prazo ter fechado — dizer isso
+            é o que explica por que a festa está à venda de novo, e o que o faz
+            não deixar para amanhã um link que expira. */ ''}
+      ${oferta.liberadaPelaEquipe
+        ? `<div class="faixa"><div>
+             A equipe liberou a sua compra de <b>${escapar(oferta.liberadaPelaEquipe.rotulo)}</b>, mesmo depois do prazo.
+             Vale enquanto o link que você recebeu estiver válido.
+           </div></div>` : ''}
 
       ${oferta.bloqueio && !(oferta.pendenciasDeCadastro || []).length
         ? `<div class="faixa alerta"><div>${escapar(oferta.bloqueio)}</div></div>` : ''}
