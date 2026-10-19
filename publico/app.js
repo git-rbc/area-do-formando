@@ -3907,9 +3907,31 @@ if ('serviceWorker' in navigator) {
   addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
 
+/**
+ * O TOKEN DA PÁGINA DO EVENTO (19/10/2026).
+ *
+ * `?c=<token>` abre a página pública da festa — a que a equipe manda quando a
+ * compra já fechou, ou quando a pessoa não está conseguindo entrar no portal.
+ * `?convite=` é o nome antigo do mesmo parâmetro, e segue aceito porque há
+ * links dele circulando.
+ */
+function tokenDoEventoNaUrl() {
+  try {
+    const q = new URLSearchParams(location.search);
+    return q.get('c') || q.get('convite') || null;
+  } catch { return null; }
+}
+
 (async function iniciar() {
   aplicarTema(temaAtual());
   estado.visao = visaoGuardada();
+
+  // A PÁGINA DO EVENTO VEM ANTES DA SESSÃO. Quem chega pelo link da equipe
+  // precisa ver a festa mesmo sem conseguir entrar no portal — é justamente
+  // para isso que o link existe.
+  const tokenEvento = tokenDoEventoNaUrl();
+  if (tokenEvento) return telaEventoPublico(tokenEvento);
+
   const guardado = recuperar();
   // Na demonstração e no local o /config responde sem sessão, e a tela de
   // entrada usa o que vem dele (CPF de exemplo, aviso de ambiente). No CRM ele
@@ -3924,3 +3946,262 @@ if ('serviceWorker' in navigator) {
   }
   telaEntrar();
 })();
+
+/* ───────────────────────────────────────────────────────────────────────────
+   A PÁGINA PÚBLICA DO EVENTO (19/10/2026)
+
+   Quem chega aqui recebeu um link da equipe: ou a compra já fechou (7 dias
+   antes da festa) e ele foi aprovado caso a caso, ou não está conseguindo
+   entrar no portal — login travado, telefone trocado, sistema fora do ar.
+
+   Por isso a página mostra a festa ANTES de pedir qualquer coisa: data, lugar
+   com endereço, como chegar e o que levar. Só para comprar é que ela pede CPF
+   e código, porque o convite entra no contrato de alguém e esse alguém precisa
+   ser quem diz que é.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/** O endereço da API pública: a mesma base do CRM, outro caminho. */
+function baseEventoPublico() {
+  if (!window.API_URL) return null;
+  return String(window.API_URL).replace(/\/area-formando\/?$/, '/evento-publico');
+}
+
+async function pedirEventoPublico(caminho, opcoes = {}) {
+  const base = baseEventoPublico();
+  if (!base) throw new Error('Esta página só funciona no site publicado.');
+  const r = await fetch(`${base}${caminho}`, {
+    method: opcoes.method || 'GET',
+    headers: { 'content-type': 'application/json' },
+    ...(opcoes.body ? { body: opcoes.body } : {}),
+  });
+  const envelope = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const erro = new Error(envelope.message || 'Não foi possível agora.');
+    erro.status = r.status;
+    throw erro;
+  }
+  return envelope.data ?? envelope;
+}
+
+function horasLegiveis(h) {
+  if (h == null) return '';
+  if (h < 1) return `${Math.max(1, Math.round(h * 60))} minutos`;
+  if (h < 48) return `${Math.round(h)} horas`;
+  return `${Math.round(h / 24)} dias`;
+}
+
+async function telaEventoPublico(token) {
+  app.className = 'entrar';
+  app.innerHTML = `<div class="entrar-caixa">${marca()}<div class="cartao"><div class="vazio">Carregando a festa…</div></div></div>`;
+
+  let evento;
+  try {
+    evento = await pedirEventoPublico(`/${encodeURIComponent(token)}`);
+  } catch (e) {
+    const expirou = e.status === 410;
+    app.innerHTML = `
+      <div class="entrar-caixa">
+        ${marca()}
+        <div class="cartao">
+          <div class="kicker">Convite</div>
+          <h1>${expirou ? 'Este link <span class="grifo">expirou</span>' : 'Link <span class="grifo">inválido</span>'}</h1>
+          <p class="sub">
+            ${expirou
+              ? 'Links de compra valem por pouco tempo, de propósito. Peça um novo para a equipe da sua formatura.'
+              : 'Confira se o endereço veio inteiro na mensagem. Se continuar, fale com a equipe.'}
+          </p>
+          <button class="botao" id="ir-portal">Ir para a Área do Formando</button>
+        </div>
+        ${notaRodape()}
+      </div>`;
+    app.querySelector('#ir-portal').addEventListener('click', () => {
+      history.replaceState(null, '', location.pathname);
+      location.reload();
+    });
+    return;
+  }
+
+  // O token fica guardado: é ele que reabre a compra depois do prazo, e o
+  // adaptador o manda em toda a conversa da compra.
+  try { sessionStorage.setItem('area-formando:liberacao', token); } catch { /* segue sem guardar */ }
+
+  const l = evento.local || {};
+  const quando = evento.data ? dataLonga(evento.data) : 'data a confirmar';
+  const preco = evento.preco
+    ? (evento.preco.de === evento.preco.ate ? brl(evento.preco.de) : `${brl(evento.preco.de)} a ${brl(evento.preco.ate)}`)
+    : null;
+
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(evento.rotulo || 'Convite')}</div>
+        <h1>${escapar(evento.nome)}</h1>
+        <p class="sub">
+          ${escapar(quando)}${evento.hora ? ` · ${escapar(String(evento.hora).slice(0, 5))}` : ''}
+          ${evento.turmas && evento.turmas.length ? ` · ${escapar(evento.turmas.join(' + '))}` : ''}
+        </p>
+
+        <div class="dado"><span>Onde</span><b>${escapar(l.nome || 'a confirmar')}</b></div>
+        ${l.endereco ? `<div class="dado"><span>Endereço</span><b>${escapar(l.endereco)}</b></div>` : ''}
+        ${l.mapaUrl ? `<div class="dado"><span>Como chegar</span><a class="link-inline" href="${escapar(l.mapaUrl)}" target="_blank" rel="noopener">abrir no mapa</a></div>` : ''}
+        ${l.estacionamento ? `<div class="dado"><span>Estacionamento</span><b>${escapar(l.estacionamento)}</b></div>` : ''}
+        ${preco ? `<div class="dado"><span>Convite</span><b class="destaque-valor">${escapar(preco)}</b></div>` : ''}
+        ${evento.vagas != null ? `<div class="dado"><span>Ainda cabem</span><b>${evento.vagas}</b></div>` : ''}
+
+        ${evento.regrasEntrada ? `
+          <div class="faixa" style="margin-top:12px"><div>
+            <b>Para entrar:</b> ${escapar(evento.regrasEntrada)}
+          </div></div>` : ''}
+
+        <button class="botao" id="comprar" style="margin-top:14px">Comprar meu convite</button>
+
+        <p class="rodape-nota" style="margin-top:10px">
+          Este link vale por mais ${escapar(horasLegiveis(evento.horasRestantes))} e foi liberado para você pela
+          equipe. Para comprar, confirmamos o seu CPF com um código — o convite entra no seu contrato.
+        </p>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelector('#comprar').addEventListener('click', () => telaEventoCpf(token, evento));
+}
+
+/** O CPF, com a festa à vista para a pessoa saber onde está. */
+function telaEventoCpf(token, evento, erro) {
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(evento.nome)}</div>
+        <h1>Confirme seu <span class="grifo">CPF</span></h1>
+        <p class="sub">Vamos mandar um código por WhatsApp ou e-mail. O convite entra no seu contrato, por isso precisamos ter certeza de que é você.</p>
+        <form id="form-cpf" novalidate>
+          <div class="campo">
+            <label for="cpf">CPF</label>
+            <input id="cpf" inputmode="numeric" autocomplete="off" placeholder="000.000.000-00" value="${escapar(mascaraCpf(estado.cpf || ''))}" />
+          </div>
+          ${erro ? `<p class="erro">${escapar(erro)}</p>` : ''}
+          <button class="botao" type="submit">Receber código</button>
+        </form>
+        <button class="link-inline" id="voltar" style="margin-top:10px">voltar para a festa</button>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  const campo = app.querySelector('#cpf');
+  campo.addEventListener('input', () => { campo.value = mascaraCpf(campo.value); });
+  app.querySelector('#voltar').addEventListener('click', () => telaEventoPublico(token));
+
+  app.querySelector('#form-cpf').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cpf = campo.value.replace(/\D/g, '');
+    if (cpf.length !== 11) return telaEventoCpf(token, evento, 'Digite os 11 números do CPF.');
+    estado.cpf = cpf;
+    const botao = app.querySelector('button[type=submit]');
+    botao.disabled = true;
+    botao.textContent = 'Enviando…';
+    try {
+      const r = await pedirEventoPublico(`/${encodeURIComponent(token)}/auth/codigo`, {
+        method: 'POST',
+        body: JSON.stringify({ cpf }),
+      });
+      telaEventoCodigo(token, evento, r);
+    } catch (err) {
+      telaEventoCpf(token, evento, err.message);
+    }
+  });
+}
+
+/** O código, e a entrada direta na compra. */
+function telaEventoCodigo(token, evento, envio, erro) {
+  app.className = 'entrar';
+  const destinos = [envio && envio.destinos && envio.destinos.whatsapp, envio && envio.destinos && envio.destinos.email].filter(Boolean);
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(evento.nome)}</div>
+        <h1>Digite o <span class="grifo">código</span></h1>
+        <p class="sub">${destinos.length ? `Enviado para ${escapar(destinos.join(' e '))}.` : 'Enviado para o seu contato cadastrado.'}</p>
+        ${envio && envio.codigoDev ? `<div class="dev">Ambiente de teste — o código é <strong class="cpf">${escapar(envio.codigoDev)}</strong></div>` : ''}
+        <form id="form-codigo" novalidate>
+          <div class="campo">
+            <label for="codigo">Código de 6 dígitos</label>
+            <input id="codigo" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000" />
+          </div>
+          ${erro ? `<p class="erro">${escapar(erro)}</p>` : ''}
+          <button class="botao" type="submit">Entrar e comprar</button>
+        </form>
+        <button class="link-inline" id="voltar" style="margin-top:10px">usar outro CPF</button>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelector('#voltar').addEventListener('click', () => telaEventoCpf(token, evento));
+  app.querySelector('#form-codigo').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const codigo = app.querySelector('#codigo').value.replace(/\D/g, '');
+    if (codigo.length !== 6) return telaEventoCodigo(token, evento, envio, 'O código tem 6 números.');
+    const botao = app.querySelector('button[type=submit]');
+    botao.disabled = true;
+    botao.textContent = 'Entrando…';
+    try {
+      const r = await pedirEventoPublico(`/${encodeURIComponent(token)}/auth/verificar`, {
+        method: 'POST',
+        body: JSON.stringify({ cpf: estado.cpf, codigo }),
+      });
+      // Duas turmas do mesmo CPF nesta festa: ele escolhe qual.
+      if (r.etapa === 'escolha') return telaEventoEscolha(token, evento, r.adesoes || []);
+      await entrarComToken(r.token);
+    } catch (err) {
+      telaEventoCodigo(token, evento, envio, err.message);
+    }
+  });
+}
+
+function telaEventoEscolha(token, evento, adesoes) {
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(evento.nome)}</div>
+        <h1>Qual <span class="grifo">turma</span>?</h1>
+        <p class="sub">Seu CPF aparece em mais de uma turma desta festa.</p>
+        ${adesoes.map((a) => `
+          <button class="botao secundario" data-adesao="${escapar(a.adesaoId)}" style="margin-bottom:8px">
+            ${escapar(a.turma)} — ${escapar(a.nome)}
+          </button>`).join('')}
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelectorAll('[data-adesao]').forEach((b) => b.addEventListener('click', async () => {
+    try {
+      const r = await pedirEventoPublico(`/${encodeURIComponent(token)}/auth/escolher`, {
+        method: 'POST',
+        body: JSON.stringify({ cpf: estado.cpf, adesaoId: b.dataset.adesao }),
+      });
+      await entrarComToken(r.token);
+    } catch (err) {
+      avisar(err.message);
+    }
+  }));
+}
+
+/**
+ * Entra com o token recebido e abre a compra já na festa do link.
+ *
+ * Daqui em diante é o portal de sempre: a tela de convites conhece a liberação
+ * (o adaptador manda o token guardado) e a compra que ele fizer aparece no
+ * contrato dele como qualquer outra.
+ */
+async function entrarComToken(token) {
+  estado.token = token;
+  guardar(token);
+  history.replaceState(null, '', location.pathname);
+  await entrar();
+  telaConvites();
+}
