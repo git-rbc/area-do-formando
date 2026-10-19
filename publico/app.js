@@ -3183,6 +3183,16 @@ async function telaConvites() {
       <h2>Convites <em>extras</em></h2>
       <div class="sub">Escolha as festas, a quantidade e como pagar. O aditivo é assinado por e-mail.</div>
 
+      ${/* A LIBERAÇÃO PRECISA APARECER. Ele chegou aqui por um link que a
+            equipe mandou para ele, depois de o prazo ter fechado — dizer isso
+            é o que explica por que a festa está à venda de novo, e o que o faz
+            não deixar para amanhã um link que expira. */ ''}
+      ${oferta.liberadaPelaEquipe
+        ? `<div class="faixa"><div>
+             A equipe liberou a sua compra de <b>${escapar(oferta.liberadaPelaEquipe.rotulo)}</b>, mesmo depois do prazo.
+             Vale enquanto o link que você recebeu estiver válido.
+           </div></div>` : ''}
+
       ${oferta.bloqueio && !(oferta.pendenciasDeCadastro || []).length
         ? `<div class="faixa alerta"><div>${escapar(oferta.bloqueio)}</div></div>` : ''}
 
