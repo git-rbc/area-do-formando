@@ -4045,9 +4045,7 @@ async function telaEventoPublico(token) {
         <div class="dado"><span>Onde</span><b>${escapar(l.nome || 'a confirmar')}</b></div>
         ${l.endereco ? `<div class="dado"><span>Endereço</span><b>${escapar(l.endereco)}</b></div>` : ''}
         ${l.mapaUrl ? `<div class="dado"><span>Como chegar</span><a class="link-inline" href="${escapar(l.mapaUrl)}" target="_blank" rel="noopener">abrir no mapa</a></div>` : ''}
-        ${l.estacionamento ? `<div class="dado"><span>Estacionamento</span><b>${escapar(l.estacionamento)}</b></div>` : ''}
         ${preco ? `<div class="dado"><span>Convite</span><b class="destaque-valor">${escapar(preco)}</b></div>` : ''}
-        ${evento.vagas != null ? `<div class="dado"><span>Ainda cabem</span><b>${evento.vagas}</b></div>` : ''}
 
         ${evento.regrasEntrada ? `
           <div class="faixa" style="margin-top:12px"><div>
@@ -4154,7 +4152,7 @@ function telaEventoCodigo(token, evento, envio, erro) {
       });
       // Duas turmas do mesmo CPF nesta festa: ele escolhe qual.
       if (r.etapa === 'escolha') return telaEventoEscolha(token, evento, r.adesoes || []);
-      await entrarComToken(r.token);
+      await entrarComToken(r.token, token, evento);
     } catch (err) {
       telaEventoCodigo(token, evento, envio, err.message);
     }
@@ -4184,7 +4182,7 @@ function telaEventoEscolha(token, evento, adesoes) {
         method: 'POST',
         body: JSON.stringify({ cpf: estado.cpf, adesaoId: b.dataset.adesao }),
       });
-      await entrarComToken(r.token);
+      await entrarComToken(r.token, token, evento);
     } catch (err) {
       avisar(err.message);
     }
@@ -4192,16 +4190,354 @@ function telaEventoEscolha(token, evento, adesoes) {
 }
 
 /**
- * Entra com o token recebido e abre a compra já na festa do link.
+ * Entra e segue COMPRANDO NESTA PÁGINA — sem abrir o portal.
  *
- * Daqui em diante é o portal de sempre: a tela de convites conhece a liberação
- * (o adaptador manda o token guardado) e a compra que ele fizer aparece no
- * contrato dele como qualquer outra.
+ * O portal ainda não foi liberado para os alunos (decisão do Dani, 19/10), e o
+ * link precisa funcionar antes disso. Então o acesso obtido aqui serve só para
+ * as rotas da compra: nada de sessão guardada, nada de tela do portal. Quem
+ * fechar a aba volta do começo, com o link, que é o comportamento certo para
+ * uma página de ingresso.
  */
-async function entrarComToken(token) {
-  estado.token = token;
-  guardar(token);
-  history.replaceState(null, '', location.pathname);
-  await entrar();
-  telaConvites();
+async function entrarComToken(acesso, tokenDoEvento, evento) {
+  compraEvento.token = tokenDoEvento;
+  compraEvento.acesso = acesso;
+  compraEvento.evento = evento;
+
+  // A festa e o preço já vieram na página: é a mesma conta do contrato.
+  compraEvento.festa = evento.festaChave;
+  compraEvento.unitario = evento.preco ? evento.preco.de : 0;
+  compraEvento.quantidade = 1;
+  compraEvento.nomes = [];
+  telaComprarIngresso();
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   A COMPRA NA PRÓPRIA PÁGINA DO EVENTO (19/10/2026)
+
+   O formando NÃO entra no portal aqui (pedido do Dani): o portal ainda não foi
+   liberado para os alunos, e o link precisa funcionar antes disso. Então a
+   compra inteira acontece nesta página — quantidade, nomes, pagamento,
+   aditivo e ingresso —, usando as mesmas rotas e o mesmo contrato de sempre.
+
+   A ORDEM É A DE UM SITE DE INGRESSO: escolher quantos, dizer quem usa cada
+   um, pagar, assinar, receber o ingresso. Os nomes vêm ANTES do pagamento de
+   propósito: o link é mandado perto da festa, quando a operação já precisa
+   saber quem entra, e pedir depois de cobrar seria deixar a equipe correndo
+   atrás de nome com o dinheiro já na conta.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/** O estado da compra nesta página. Vive só aqui; sair da página o descarta. */
+const compraEvento = {
+  token: null,
+  acesso: null,
+  evento: null,
+  festa: null,
+  unitario: 0,
+  quantidade: 1,
+  forma: 'pix',
+  parcelas: 1,
+  nomes: [],
+};
+
+async function pedirComAcesso(caminho, opcoes = {}) {
+  const base = baseEventoPublico();
+  const r = await fetch(`${base}${caminho}`, {
+    method: opcoes.method || 'GET',
+    headers: {
+      'content-type': 'application/json',
+      authorization: `Bearer ${compraEvento.acesso}`,
+    },
+    ...(opcoes.body ? { body: opcoes.body } : {}),
+  });
+  const envelope = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const erro = new Error(envelope.message || 'Não foi possível agora.');
+    erro.status = r.status;
+    throw erro;
+  }
+  return envelope.data ?? envelope;
+}
+
+/** Depois do login: escolher quantos convites e como pagar. */
+function telaComprarIngresso(erro) {
+  const e = compraEvento.evento;
+  const total = compraEvento.unitario * compraEvento.quantidade;
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(e.nome)}</div>
+        <h1>Quantos <span class="grifo">convites</span>?</h1>
+        <p class="sub">
+          ${escapar(e.data ? dataLonga(e.data) : 'data a confirmar')}${e.hora ? ` · ${escapar(String(e.hora).slice(0, 5))}` : ''}
+          ${e.local?.nome ? ` · ${escapar(e.local.nome)}` : ''}
+        </p>
+
+        <div class="convite-item">
+          <div class="convite-cab">
+            <div>
+              <b>Convite avulso</b>
+              <span class="convite-sub">${escapar(brl(compraEvento.unitario))} cada</span>
+            </div>
+            <div class="passo">
+              <button type="button" class="passo-btn" id="menos" aria-label="Menos um">−</button>
+              <span class="passo-qtd">${compraEvento.quantidade}</span>
+              <button type="button" class="passo-btn" id="mais" aria-label="Mais um">+</button>
+            </div>
+          </div>
+          <div class="convite-linha-valor">
+            <span>${compraEvento.quantidade} × ${escapar(brl(compraEvento.unitario))}</span>
+            <b class="destaque-valor">${escapar(brl(total))}</b>
+          </div>
+        </div>
+
+        <div class="secao-titulo">Como pagar</div>
+        <div class="festas-escolha">
+          <button type="button" class="festa-chip ${compraEvento.forma === 'pix' ? 'ativo' : ''}" data-forma="pix">
+            <span class="nome">Pix</span><span class="preco">sem taxa</span>
+          </button>
+          <button type="button" class="festa-chip ${compraEvento.forma === 'cartao' ? 'ativo' : ''}" data-forma="cartao">
+            <span class="nome">Cartão</span><span class="preco">até 10x</span>
+          </button>
+        </div>
+
+        ${erro ? `<p class="erro">${escapar(erro)}</p>` : ''}
+        <button class="botao" id="seguir" style="margin-top:14px">Continuar</button>
+        <p class="rodape-nota" style="margin-top:10px">
+          No Pix você paga o valor dos convites, sem acréscimo. No cartão, a operadora cobra taxa e juros, que
+          aparecem antes de você confirmar.
+        </p>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelector('#menos').addEventListener('click', () => {
+    if (compraEvento.quantidade > 1) compraEvento.quantidade--;
+    telaComprarIngresso();
+  });
+  app.querySelector('#mais').addEventListener('click', () => {
+    if (compraEvento.quantidade < 20) compraEvento.quantidade++;
+    telaComprarIngresso();
+  });
+  app.querySelectorAll('[data-forma]').forEach((b) =>
+    b.addEventListener('click', () => {
+      compraEvento.forma = b.dataset.forma;
+      telaComprarIngresso();
+    }),
+  );
+  app.querySelector('#seguir').addEventListener('click', () => telaNomesDosIngressos());
+}
+
+/**
+ * Os nomes, um por ingresso — obrigatórios.
+ *
+ * Quem recebeu este link está comprando perto da festa, e a portaria precisa
+ * da lista fechada. Pedir aqui, e não depois, é o que impede a compra paga sem
+ * nome — que vira trabalho manual para a equipe na véspera.
+ */
+function telaNomesDosIngressos(erro) {
+  const n = compraEvento.quantidade;
+  while (compraEvento.nomes.length < n) compraEvento.nomes.push({ nome: '', documento: '', telefone: '' });
+  compraEvento.nomes = compraEvento.nomes.slice(0, n);
+
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(compraEvento.evento.nome)}</div>
+        <h1>Quem vai <span class="grifo">usar</span>?</h1>
+        <p class="sub">Um nome por convite. A portaria confere pelo nome e pelo documento, então escreva como está no documento.</p>
+
+        ${compraEvento.nomes.map((c, i) => `
+          <div class="convite-item">
+            <div class="secao-titulo" style="margin-top:0">Convite ${i + 1}</div>
+            <div class="campo">
+              <label for="nome-${i}">Nome completo</label>
+              <input id="nome-${i}" data-campo="nome" data-i="${i}" value="${escapar(c.nome)}" autocomplete="off" />
+            </div>
+            <div class="campo">
+              <label for="doc-${i}">Documento (opcional)</label>
+              <input id="doc-${i}" data-campo="documento" data-i="${i}" value="${escapar(c.documento)}" autocomplete="off" />
+            </div>
+            <div class="campo">
+              <label for="tel-${i}">Telefone (opcional)</label>
+              <input id="tel-${i}" data-campo="telefone" data-i="${i}" value="${escapar(c.telefone)}" inputmode="numeric" autocomplete="off" />
+            </div>
+          </div>`).join('')}
+
+        ${erro ? `<p class="erro">${escapar(erro)}</p>` : ''}
+        <button class="botao" id="pagar">Ir para o pagamento</button>
+        <button class="link-inline" id="voltar" style="margin-top:10px">voltar</button>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelectorAll('[data-campo]').forEach((campo) =>
+    campo.addEventListener('input', () => {
+      compraEvento.nomes[Number(campo.dataset.i)][campo.dataset.campo] = campo.value;
+    }),
+  );
+  app.querySelector('#voltar').addEventListener('click', () => telaComprarIngresso());
+  app.querySelector('#pagar').addEventListener('click', async () => {
+    const faltando = compraEvento.nomes.filter((c) => c.nome.trim().length < 3).length;
+    if (faltando) return telaNomesDosIngressos(`Falta o nome de ${faltando} convidado(s).`);
+    await confirmarCompraDoEvento();
+  });
+}
+
+/** Mostra a conta e cobra. */
+async function confirmarCompraDoEvento() {
+  app.innerHTML = `<div class="entrar-caixa">${marca()}<div class="cartao"><div class="vazio">Preparando o pagamento…</div></div></div>`;
+  const itens = [{ festa: compraEvento.festa, quantidade: compraEvento.quantidade }];
+
+  try {
+    const previa = await pedirComAcesso(`/${encodeURIComponent(compraEvento.token)}/simular`, {
+      method: 'POST',
+      body: JSON.stringify({ itens, forma: compraEvento.forma, parcelasCartao: compraEvento.parcelas }),
+    });
+
+    const compra = await pedirComAcesso(`/${encodeURIComponent(compraEvento.token)}/comprar`, {
+      method: 'POST',
+      body: JSON.stringify({
+        itens,
+        forma: compraEvento.forma,
+        parcelasCartao: compraEvento.parcelas,
+        nomes: compraEvento.nomes.map((c) => ({
+          nome: c.nome.trim(),
+          documento: c.documento.trim() || null,
+          telefone: c.telefone.trim() || null,
+        })),
+      }),
+    });
+
+    telaPagamentoDoEvento(compra, previa);
+  } catch (e) {
+    telaNomesDosIngressos(e.message);
+  }
+}
+
+/** O Pix ou o cartão, e o caminho para o ingresso depois de pago. */
+function telaPagamentoDoEvento(compra, previa) {
+  const pix = compra.forma === 'pix';
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(compraEvento.evento.nome)}</div>
+        <h1>${pix ? 'Pague com <span class="grifo">Pix</span>' : 'Pague no <span class="grifo">cartão</span>'}</h1>
+        <p class="sub">${compraEvento.quantidade} convite(s) · <b>${escapar(brl(compra.valor))}</b></p>
+
+        ${pix && compra.pixCopiaECola ? `
+          <div class="campo">
+            <label for="pix">Copie o código e pague no seu banco</label>
+            <textarea id="pix" class="pix-codigo" readonly rows="4">${escapar(compra.pixCopiaECola)}</textarea>
+          </div>
+          <button class="botao" id="copiar">Copiar código Pix</button>
+          ${compra.pixExpiraEm ? `<p class="rodape-nota">O código vale até ${escapar(dataCurta(compra.pixExpiraEm))}.</p>` : ''}
+        ` : `
+          <a class="botao" href="${escapar(compra.url)}" target="_blank" rel="noopener">Abrir o pagamento</a>
+        `}
+
+        <p class="rodape-nota" style="margin-top:12px">
+          Assim que o pagamento cair, você assina o aditivo por e-mail e o ingresso fica disponível aqui.
+          Protocolo da compra guardado — toque em “Já paguei” para conferir.
+        </p>
+        <button class="botao secundario" id="conferir" style="margin-top:10px">Já paguei, ver meu ingresso</button>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelector('#copiar')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(compra.pixCopiaECola);
+      avisar('Código copiado');
+    } catch {
+      avisar('Copie o código da caixa acima');
+    }
+  });
+  app.querySelector('#conferir').addEventListener('click', () => telaIngressoDoEvento(compra.compraId));
+}
+
+/** O ingresso: protocolo, códigos e o PDF. */
+async function telaIngressoDoEvento(compraId) {
+  app.innerHTML = `<div class="entrar-caixa">${marca()}<div class="cartao"><div class="vazio">Buscando seu ingresso…</div></div></div>`;
+
+  let c;
+  try {
+    c = await pedirComAcesso(`/${encodeURIComponent(compraEvento.token)}/compra/${encodeURIComponent(compraId)}`);
+  } catch (e) {
+    app.innerHTML = `<div class="entrar-caixa">${marca()}<div class="cartao">
+      <h1>Ainda <span class="grifo">não</span></h1>
+      <p class="sub">${escapar(e.message)}</p>
+      <button class="botao" id="tentar">Tentar de novo</button></div>${notaRodape()}</div>`;
+    app.querySelector('#tentar').addEventListener('click', () => telaIngressoDoEvento(compraId));
+    return;
+  }
+
+  const pago = !!c.pagoEm;
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">Protocolo ${escapar(c.protocolo)}</div>
+        <h1>${pago ? 'Ingresso <span class="grifo">confirmado</span>' : 'Pagamento <span class="grifo">pendente</span>'}</h1>
+        <p class="sub">${escapar(c.festa.nome)} · ${escapar(c.festa.data ? dataLonga(c.festa.data) : 'data a confirmar')}</p>
+
+        ${!pago ? `
+          <div class="faixa alerta"><div>
+            Ainda não recebemos a confirmação do pagamento. Se você acabou de pagar, aguarde alguns minutos e
+            atualize esta página.
+          </div></div>` : ''}
+
+        ${c.assinaturaUrl && !c.assinadoEm ? `
+          <div class="faixa"><div>
+            Falta <b>assinar o aditivo</b> — ele formaliza a compra no seu contrato.
+            <br><a class="link-inline" href="${escapar(c.assinaturaUrl)}" target="_blank" rel="noopener">assinar agora</a>
+          </div></div>` : ''}
+
+        ${c.ingressos.map((i) => `
+          <div class="convite-item">
+            <div class="convite-cab">
+              <div>
+                <b>${escapar(i.convidado)}</b>
+                ${i.documento ? `<span class="convite-sub">${escapar(i.documento)}</span>` : ''}
+              </div>
+              <code class="pix-codigo" style="font-size:1.05rem">${escapar(i.codigo)}</code>
+            </div>
+          </div>`).join('')}
+
+        <button class="botao" id="baixar" style="margin-top:12px">Baixar ingresso em PDF</button>
+        <button class="link-inline" id="atualizar" style="margin-top:10px">atualizar</button>
+
+        <p class="rodape-nota" style="margin-top:10px">
+          Apresente o ingresso na entrada, impresso ou na tela do celular.
+          ${c.festa.regrasEntrada ? escapar(c.festa.regrasEntrada) : ''}
+        </p>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelector('#atualizar').addEventListener('click', () => telaIngressoDoEvento(compraId));
+  app.querySelector('#baixar').addEventListener('click', async () => {
+    try {
+      const base = baseEventoPublico();
+      const r = await fetch(`${base}/${encodeURIComponent(compraEvento.token)}/compra/${encodeURIComponent(compraId)}/pdf`, {
+        headers: { authorization: `Bearer ${compraEvento.acesso}` },
+      });
+      if (!r.ok) throw new Error('falha');
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ingresso-${c.protocolo}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      avisar('Não foi possível gerar o PDF agora');
+    }
+  });
 }
