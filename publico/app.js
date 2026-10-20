@@ -4052,17 +4052,45 @@ async function telaEventoPublico(token) {
             <b>Para entrar:</b> ${escapar(evento.regrasEntrada)}
           </div></div>` : ''}
 
-        <button class="botao" id="comprar" style="margin-top:14px">Comprar meu convite</button>
+        <button class="botao" id="comprar" style="margin-top:14px">
+          ${evento.convidadoDe ? 'Comprar o convite' : 'Comprar meu convite'}
+        </button>
 
         <p class="rodape-nota" style="margin-top:10px">
-          Este link vale por mais ${escapar(horasLegiveis(evento.horasRestantes))} e foi liberado para você pela
-          equipe. Para comprar, confirmamos o seu CPF com um código — o convite entra no seu contrato.
+          ${evento.convidadoDe
+            ? `Este link foi compartilhado por <b>${escapar(evento.convidadoDe)}</b> e vale por mais
+               ${escapar(horasLegiveis(evento.horasRestantes))}. O convite que você comprar fica no nome que você
+               informar, como convidado de ${escapar(evento.convidadoDe)} — não é preciso CPF.`
+            : `Este link vale por mais ${escapar(horasLegiveis(evento.horasRestantes))} e foi liberado para você pela
+               equipe. Para comprar, confirmamos o seu CPF com um código — o convite entra no seu contrato.`}
         </p>
       </div>
       ${notaRodape()}
     </div>`;
 
-  app.querySelector('#comprar').addEventListener('click', () => telaEventoCpf(token, evento));
+  // LINK COMPARTILHADO PELO FORMANDO: sem CPF (20/10/2026). O link já diz de
+  // quem é o convite, e pedir o CPF de um terceiro não provaria nada — ele
+  // não é o formando. Quem autoriza é quem compartilhou.
+  app.querySelector('#comprar').addEventListener('click', () =>
+    evento.convidadoDe ? entrarComoConvidado(token, evento) : telaEventoCpf(token, evento),
+  );
+}
+
+/** Entra pelo link que o formando compartilhou: o token basta. */
+async function entrarComoConvidado(token, evento) {
+  app.innerHTML = `<div class="entrar-caixa">${marca()}<div class="cartao"><div class="vazio">Abrindo a compra…</div></div></div>`;
+  try {
+    const r = await pedirEventoPublico(`/${encodeURIComponent(token)}/acesso-convidado`, { method: 'POST' });
+    await entrarComToken(r.token, token, evento);
+  } catch (e) {
+    app.innerHTML = `
+      <div class="entrar-caixa">${marca()}<div class="cartao">
+        <h1>Não <span class="grifo">deu</span></h1>
+        <p class="sub">${escapar(e.message)}</p>
+        <button class="botao" id="voltar">Voltar</button>
+      </div>${notaRodape()}</div>`;
+    app.querySelector('#voltar').addEventListener('click', () => telaEventoPublico(token));
+  }
 }
 
 /** O CPF, com a festa à vista para a pessoa saber onde está. */
@@ -4203,11 +4231,60 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
   compraEvento.acesso = acesso;
   compraEvento.evento = evento;
 
-  // A festa e o preço já vieram na página: é a mesma conta do contrato.
   compraEvento.festa = evento.festaChave;
-  compraEvento.unitario = evento.preco ? evento.preco.de : 0;
   compraEvento.quantidade = 1;
   compraEvento.nomes = [];
+  // Quem está comprando: o formando (entrou com CPF) ou alguém que recebeu o
+  // link dele. Muda o que a tela oferece e o que ela pode pedir ao servidor.
+  compraEvento.comoConvidado = !!evento.convidadoDe;
+  compraEvento.convidadoDe = evento.convidadoDe || null;
+
+  // O PREÇO É DA TURMA DELE, NÃO O MAIS BARATO DO EVENTO (20/10/2026).
+  //
+  // Isto usava `evento.preco.de`, o menor preço entre as turmas da festa.
+  // Enquanto todas as turmas cobram o mesmo, `de` e `ate` são iguais e
+  // ninguém nota. Com duas turmas em preços diferentes — que é o caso de
+  // qualquer festa compartilhada — a página prometia o preço da turma mais
+  // barata a todo mundo e o servidor cobrava o certo: o formando veria R$ 1
+  // na tela e R$ 170 na fatura.
+  //
+  // Agora quem diz o preço é o servidor, que sabe de que turma ele é. Se a
+  // consulta falhar, a página volta ao preço da festa só para não ficar sem
+  // nada na tela — e a conta verdadeira ainda aparece antes de pagar, porque
+  // a tela de pagamento mostra o que o servidor devolveu.
+  compraEvento.unitario = evento.preco ? evento.preco.de : 0;
+  try {
+    const previa = await pedirComAcesso(`/${encodeURIComponent(tokenDoEvento)}/simular`, {
+      method: 'POST',
+      body: JSON.stringify({ itens: [{ festa: evento.festaChave, quantidade: 1 }] }),
+    });
+    const linha = (previa.linhas || [])[0];
+    if (linha && Number(linha.unitario) > 0) compraEvento.unitario = Number(linha.unitario);
+  } catch (_) {
+    /* fica o preço da festa: a conta de verdade aparece antes de pagar */
+  }
+
+  // O QUE ELE JÁ COMPROU NESTA FESTA (20/10/2026).
+  //
+  // Quem entra com o CPF pode já ter comprado — na semana passada, ou cinco
+  // minutos atrás noutro aparelho. A página só oferecia comprar de novo, e a
+  // pessoa não tinha como ver o ingresso que já tem nem conferir se a compra
+  // ficou registrada. É a primeira pergunta de quem recebe o link e não
+  // lembra se concluiu.
+  //
+  // Falhar aqui não impede a compra: a tela segue sem o bloco. E quem veio
+  // pelo link compartilhado não vê este histórico — ele é do formando, e o
+  // servidor recusa; nem se pede.
+  compraEvento.jaComprados = [];
+  if (!compraEvento.comoConvidado) {
+    try {
+      const feitas = await pedirComAcesso(`/${encodeURIComponent(tokenDoEvento)}/minhas-compras`);
+      if (Array.isArray(feitas)) compraEvento.jaComprados = feitas;
+    } catch (_) {
+      /* sem o histórico a compra continua possível */
+    }
+  }
+
   telaComprarIngresso();
 }
 
@@ -4237,6 +4314,8 @@ const compraEvento = {
   forma: 'pix',
   parcelas: 1,
   nomes: [],
+  /** Comprovantes das compras já concluídas desta festa. */
+  jaComprados: [],
 };
 
 async function pedirComAcesso(caminho, opcoes = {}) {
@@ -4274,6 +4353,22 @@ function telaComprarIngresso(erro) {
           ${e.local?.nome ? ` · ${escapar(e.local.nome)}` : ''}
         </p>
 
+        ${(compraEvento.jaComprados || []).length ? `
+          <div class="ja-comprados">
+            <div class="ja-titulo">Você já tem ingresso nesta festa</div>
+            ${compraEvento.jaComprados.map((c) => `
+              <div class="ja-compra">
+                <div class="ja-protocolo">Protocolo ${escapar(c.protocolo)}</div>
+                ${(c.ingressos || []).map((i) => `
+                  <div class="ja-ingresso">
+                    <span>${escapar(i.convidado || 'sem nome')}</span>
+                    <code>${escapar(i.codigo || '')}</code>
+                  </div>`).join('')}
+                <button type="button" class="link-inline" data-ver="${escapar(c.compraId || '')}">ver e baixar o ingresso</button>
+              </div>`).join('')}
+          </div>
+        ` : ''}
+
         <div class="convite-item">
           <div class="convite-cab">
             <div>
@@ -4304,13 +4399,25 @@ function telaComprarIngresso(erro) {
 
         ${erro ? `<p class="erro">${escapar(erro)}</p>` : ''}
         <button class="botao" id="seguir" style="margin-top:14px">Continuar</button>
+
+        ${compraEvento.comoConvidado ? '' : `
+          <button class="botao secundario" id="compartilhar" style="margin-top:10px">Outra pessoa vai pagar</button>
+        `}
+
         <p class="rodape-nota" style="margin-top:10px">
-          No Pix você paga o valor dos convites, sem acréscimo. No cartão, a operadora cobra taxa e juros, que
-          aparecem antes de você confirmar.
+          ${compraEvento.comoConvidado
+            ? `Você está comprando um convite de <b>${escapar(compraEvento.convidadoDe || '')}</b>.`
+            : 'No Pix você paga o valor dos convites, sem acréscimo. No cartão, a operadora cobra taxa e juros, que aparecem antes de você confirmar.'}
         </p>
       </div>
       ${notaRodape()}
     </div>`;
+
+  app.querySelectorAll('[data-ver]').forEach((b) => {
+    b.addEventListener('click', () => telaIngressoDoEvento(b.getAttribute('data-ver')));
+  });
+
+  app.querySelector('#compartilhar')?.addEventListener('click', () => telaCompartilhar());
 
   app.querySelector('#menos').addEventListener('click', () => {
     if (compraEvento.quantidade > 1) compraEvento.quantidade--;
@@ -4327,6 +4434,71 @@ function telaComprarIngresso(erro) {
     }),
   );
   app.querySelector('#seguir').addEventListener('click', () => telaNomesDosIngressos());
+}
+
+/**
+ * O LINK PARA OUTRA PESSOA PAGAR (20/10/2026).
+ *
+ * Pedido do Dani: o formando quer que a mãe, o namorado ou o amigo pague o
+ * convite. Sem isto ele teria de passar o CPF e o código do WhatsApp — que é
+ * exatamente o que a trava de acesso existe para impedir.
+ *
+ * O endereço que sai daqui já sabe de quem é o convite: quem abrir compra
+ * sem CPF nenhum, e o convite entra como DELE. Vale o mesmo tempo que o link
+ * da equipe, e apertar de novo devolve o mesmo endereço em vez de espalhar
+ * mais um.
+ */
+async function telaCompartilhar() {
+  app.innerHTML = `<div class="entrar-caixa">${marca()}<div class="cartao"><div class="vazio">Preparando o link…</div></div></div>`;
+
+  let r;
+  try {
+    r = await pedirComAcesso(`/${encodeURIComponent(compraEvento.token)}/compartilhar`, { method: 'POST' });
+  } catch (e) {
+    return telaComprarIngresso(e.message);
+  }
+
+  const texto = `Oi! Pode comprar meu convite para ${compraEvento.evento.nome}? É só abrir: ${r.url}`;
+
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(compraEvento.evento.nome)}</div>
+        <h1>Outra pessoa <span class="grifo">paga</span></h1>
+        <p class="sub">
+          Mande este link para quem vai pagar. Quem abrir compra sem precisar do seu CPF, e o convite entra como seu —
+          com o nome que a pessoa informar.
+        </p>
+
+        <div class="campo">
+          <label for="url">O link</label>
+          <textarea id="url" class="pix-codigo" readonly rows="3">${escapar(r.url)}</textarea>
+        </div>
+
+        <button class="botao" id="copiar">Copiar o link</button>
+        <a class="botao secundario" style="margin-top:10px" id="whats"
+           href="https://wa.me/?text=${encodeURIComponent(texto)}" target="_blank" rel="noopener">Mandar no WhatsApp</a>
+        <button class="botao secundario" id="voltar" style="margin-top:10px">Voltar</button>
+
+        <p class="rodape-nota" style="margin-top:12px">
+          O link vale por mais ${escapar(horasLegiveis(r.horasRestantes))} — o mesmo prazo que a equipe liberou.
+          Depois disso ele para de abrir. Você continua podendo comprar por aqui.
+        </p>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelector('#copiar').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(r.url);
+      avisar('Link copiado');
+    } catch {
+      avisar('Copie o link da caixa acima');
+    }
+  });
+  app.querySelector('#voltar').addEventListener('click', () => telaComprarIngresso());
 }
 
 /**
@@ -4421,6 +4593,14 @@ async function confirmarCompraDoEvento() {
 /** O Pix ou o cartão, e o caminho para o ingresso depois de pago. */
 function telaPagamentoDoEvento(compra, previa) {
   const pix = compra.forma === 'pix';
+  // PIX DE TESTE TEM DE SE ANUNCIAR (20/10/2026).
+  //
+  // Na turma de teste o Pix nasce e morre no CRM, e o código devolvido começa
+  // com `SIMULACAO-NAO-PAGUE`. A tela o mostrava como qualquer outro, dentro
+  // de "Copie o código e pague no seu banco" — e quem estava testando tentou
+  // pagar, achou que o sistema estava quebrado e ficou com a compra pendurada.
+  // O código já era visivelmente falso; o que faltava era a tela dizer isso.
+  const pixDeTeste = pix && String(compra.pixCopiaECola ?? '').startsWith('SIMULACAO');
   app.className = 'entrar';
   app.innerHTML = `
     <div class="entrar-caixa">
@@ -4430,9 +4610,17 @@ function telaPagamentoDoEvento(compra, previa) {
         <h1>${pix ? 'Pague com <span class="grifo">Pix</span>' : 'Pague no <span class="grifo">cartão</span>'}</h1>
         <p class="sub">${compraEvento.quantidade} convite(s) · <b>${escapar(brl(compra.valor))}</b></p>
 
+        ${pixDeTeste ? `
+          <div class="aviso-teste">
+            <b>Este é um Pix de teste.</b> Esta turma está em modo de avaliação:
+            o código abaixo não é cobrável e nenhum banco vai aceitá-lo. Para um
+            pagamento de verdade, volte e escolha o cartão.
+          </div>
+        ` : ''}
+
         ${pix && compra.pixCopiaECola ? `
           <div class="campo">
-            <label for="pix">Copie o código e pague no seu banco</label>
+            <label for="pix">${pixDeTeste ? 'Código de teste (não pague)' : 'Copie o código e pague no seu banco'}</label>
             <textarea id="pix" class="pix-codigo" readonly rows="4">${escapar(compra.pixCopiaECola)}</textarea>
           </div>
           <button class="botao" id="copiar">Copiar código Pix</button>
@@ -4478,6 +4666,15 @@ async function telaIngressoDoEvento(compraId) {
   }
 
   const pago = !!c.pagoEm;
+  // SEM INGRESSO NÃO SE OFERECE O PDF (20/10/2026).
+  //
+  // O botão "Baixar ingresso em PDF" aparecia sempre, inclusive quando a
+  // compra ainda não tinha convite nenhum — e aí o arquivo baixava em branco.
+  // Quem estava do outro lado tinha pago, assinado, e recebeu uma folha
+  // vazia; parecia sistema quebrado, e era só uma etapa que faltava.
+  // Enquanto o ingresso não existe, o lugar do botão é do "Atualizar", com a
+  // frase que diz o que está faltando.
+  const temIngresso = c.ingressos.length > 0;
   app.className = 'entrar';
   app.innerHTML = `
     <div class="entrar-caixa">
@@ -4510,8 +4707,17 @@ async function telaIngressoDoEvento(compraId) {
             </div>
           </div>`).join('')}
 
-        <button class="botao" id="baixar" style="margin-top:12px">Baixar ingresso em PDF</button>
-        <button class="link-inline" id="atualizar" style="margin-top:10px">atualizar</button>
+        ${temIngresso ? `
+          <button class="botao" id="baixar" style="margin-top:12px">Baixar ingresso em PDF</button>
+          <button class="botao secundario" id="comprar-mais" style="margin-top:10px">Comprar outro convite</button>
+          <button class="botao secundario" id="atualizar" style="margin-top:10px">Atualizar</button>
+        ` : `
+          <div class="faixa"><div>
+            O ingresso aparece aqui assim que o aditivo for assinado pelos dois lados.
+            Se você acabou de assinar, toque em atualizar.
+          </div></div>
+          <button class="botao" id="atualizar" style="margin-top:12px">Atualizar</button>
+        `}
 
         <p class="rodape-nota" style="margin-top:10px">
           Apresente o ingresso na entrada, impresso ou na tela do celular.
@@ -4522,7 +4728,23 @@ async function telaIngressoDoEvento(compraId) {
     </div>`;
 
   app.querySelector('#atualizar').addEventListener('click', () => telaIngressoDoEvento(compraId));
-  app.querySelector('#baixar').addEventListener('click', async () => {
+
+  // COMPRAR DE NOVO SEM REFAZER O LOGIN (20/10/2026).
+  //
+  // Quem comprou um convite e descobre que precisa de outro tinha de fechar a
+  // página e voltar pelo link, repetindo CPF e código. O acesso já está na
+  // mão: o que muda é a compra, não quem está comprando.
+  //
+  // A quantidade e os nomes voltam ao começo de propósito — são de uma compra
+  // que acabou. O que a tela seguinte disser sobre preço, teto e prazo
+  // continua vindo do servidor, como em qualquer outra compra.
+  app.querySelector('#comprar-mais')?.addEventListener('click', () => {
+    compraEvento.quantidade = 1;
+    compraEvento.nomes = [];
+    telaComprarIngresso();
+  });
+
+  app.querySelector('#baixar')?.addEventListener('click', async () => {
     try {
       const base = baseEventoPublico();
       const r = await fetch(`${base}/${encodeURIComponent(compraEvento.token)}/compra/${encodeURIComponent(compraId)}/pdf`, {
