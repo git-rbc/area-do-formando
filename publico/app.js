@@ -4027,12 +4027,16 @@ async function telaEventoPublico(token) {
 
   const l = evento.local || {};
   const quando = evento.data ? dataLonga(evento.data) : 'data a confirmar';
-  // O servidor manda UM preço, ou nada (21/10/2026). Antes vinha uma faixa, e
-  // esta tela mostrava "R$ 1,00 a R$ 170,00" quando as turmas da mesma festa
-  // cobravam diferente — contando para quem lê que o preço varia, sem lhe
-  // dizer qual é o dele. Preços diferentes, nenhum preço aqui: o valor certo
-  // aparece depois do CPF, quando o servidor sabe de que turma a pessoa é.
-  const preco = evento.preco ? brl(evento.preco) : null;
+  // O PREÇO NÃO APARECE AQUI (21/10/2026).
+  //
+  // Esta tela mostrava o valor antes de saber quem está do outro lado, e isso
+  // deu errado duas vezes: primeiro exibindo uma faixa ("R$ 1,00 a R$ 170,00")
+  // que contava que o preço varia entre as turmas; depois "R$ 0,00", quando o
+  // formato mudou no servidor e esta página ficou um dia atrás.
+  //
+  // O preço certo é o da TURMA de quem entrou, e isso só se sabe depois do
+  // CPF. Então ele passa a aparecer só lá, uma vez só, vindo do servidor —
+  // não há mais preço nenhum para esta tela errar.
 
   app.innerHTML = `
     <div class="entrar-caixa">
@@ -4048,7 +4052,6 @@ async function telaEventoPublico(token) {
         <div class="dado"><span>Onde</span><b>${escapar(l.nome || 'a confirmar')}</b></div>
         ${l.endereco ? `<div class="dado"><span>Endereço</span><b>${escapar(l.endereco)}</b></div>` : ''}
         ${l.mapaUrl ? `<div class="dado"><span>Como chegar</span><a class="link-inline" href="${escapar(l.mapaUrl)}" target="_blank" rel="noopener">abrir no mapa</a></div>` : ''}
-        ${preco ? `<div class="dado"><span>Convite</span><b class="destaque-valor">${escapar(preco)}</b></div>` : ''}
 
         ${evento.regrasEntrada ? `
           <div class="faixa" style="margin-top:12px"><div>
@@ -4242,20 +4245,18 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
   compraEvento.comoConvidado = !!evento.convidadoDe;
   compraEvento.convidadoDe = evento.convidadoDe || null;
 
-  // O PREÇO É DA TURMA DELE, NÃO O MAIS BARATO DO EVENTO (20/10/2026).
+  // O PREÇO VEM DO SERVIDOR, OU NÃO VEM (21/10/2026).
   //
-  // Isto usava o menor preço entre as turmas da festa.
-  // Enquanto todas as turmas cobram o mesmo, `de` e `ate` são iguais e
-  // ninguém nota. Com duas turmas em preços diferentes — que é o caso de
-  // qualquer festa compartilhada — a página prometia o preço da turma mais
-  // barata a todo mundo e o servidor cobrava o certo: o formando veria R$ 1
-  // na tela e R$ 170 na fatura.
+  // Ele é o da TURMA de quem entrou, e só o servidor sabe disso. A página já
+  // tentou adivinhar duas vezes e errou as duas: usando o menor preço da
+  // festa (prometia R$ 1 e a fatura vinha R$ 170) e caindo para zero quando
+  // o formato mudou do outro lado.
   //
-  // Agora quem diz o preço é o servidor, que sabe de que turma ele é. Se a
-  // consulta falhar, a página volta ao preço da festa só para não ficar sem
-  // nada na tela — e a conta verdadeira ainda aparece antes de pagar, porque
-  // a tela de pagamento mostra o que o servidor devolveu.
-  compraEvento.unitario = evento.preco ?? 0;
+  // Então não há mais palpite. Se a consulta falhar, `unitario` fica nulo e
+  // a tela de compra diz que não conseguiu carregar, com um botão para
+  // tentar de novo — melhor isso do que um número que pode estar errado numa
+  // tela onde a pessoa vai decidir pagar.
+  compraEvento.unitario = null;
   try {
     const previa = await pedirComAcesso(`/${encodeURIComponent(tokenDoEvento)}/simular`, {
       method: 'POST',
@@ -4264,7 +4265,7 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
     const linha = (previa.linhas || [])[0];
     if (linha && Number(linha.unitario) > 0) compraEvento.unitario = Number(linha.unitario);
   } catch (_) {
-    /* fica o preço da festa: a conta de verdade aparece antes de pagar */
+    /* sem preço: a tela de compra avisa e oferece tentar de novo */
   }
 
   // O QUE ELE JÁ COMPROU NESTA FESTA (20/10/2026).
@@ -4340,9 +4341,43 @@ async function pedirComAcesso(caminho, opcoes = {}) {
   return envelope.data ?? envelope;
 }
 
+/**
+ * O servidor não disse quanto custa.
+ *
+ * Acontece com a rede do salão, um cold start ou a conta da turma ainda sem
+ * preço cadastrado. Em qualquer um dos casos a resposta honesta é a mesma:
+ * não dá para comprar agora, e não é culpa de quem está do outro lado.
+ */
+function telaPrecoIndisponivel() {
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(compraEvento.evento?.nome ?? 'Convite')}</div>
+        <h1>Não <span class="grifo">carregou</span></h1>
+        <p class="sub">
+          Não conseguimos confirmar o valor do convite da sua turma agora. Tente de novo em instantes — se continuar,
+          fale com a equipe da sua formatura.
+        </p>
+        <button class="botao" id="tentar">Tentar de novo</button>
+      </div>
+      ${notaRodape()}
+    </div>`;
+  app.querySelector('#tentar').addEventListener('click', () =>
+    entrarComToken(compraEvento.acesso, compraEvento.token, compraEvento.evento),
+  );
+}
+
 /** Depois do login: escolher quantos convites e como pagar. */
 function telaComprarIngresso(erro) {
   const e = compraEvento.evento;
+
+  // SEM PREÇO NÃO SE COMPRA (21/10/2026). `unitario` nulo quer dizer que o
+  // servidor não respondeu quanto custa o convite da turma dele. Seguir com
+  // zero mostraria "R$ 0,00 cada" numa tela onde a pessoa decide pagar.
+  if (compraEvento.unitario == null) return telaPrecoIndisponivel();
+
   const total = compraEvento.unitario * compraEvento.quantidade;
   app.className = 'entrar';
   app.innerHTML = `
