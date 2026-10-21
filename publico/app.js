@@ -4027,9 +4027,12 @@ async function telaEventoPublico(token) {
 
   const l = evento.local || {};
   const quando = evento.data ? dataLonga(evento.data) : 'data a confirmar';
-  const preco = evento.preco
-    ? (evento.preco.de === evento.preco.ate ? brl(evento.preco.de) : `${brl(evento.preco.de)} a ${brl(evento.preco.ate)}`)
-    : null;
+  // O servidor manda UM preço, ou nada (21/10/2026). Antes vinha uma faixa, e
+  // esta tela mostrava "R$ 1,00 a R$ 170,00" quando as turmas da mesma festa
+  // cobravam diferente — contando para quem lê que o preço varia, sem lhe
+  // dizer qual é o dele. Preços diferentes, nenhum preço aqui: o valor certo
+  // aparece depois do CPF, quando o servidor sabe de que turma a pessoa é.
+  const preco = evento.preco ? brl(evento.preco) : null;
 
   app.innerHTML = `
     <div class="entrar-caixa">
@@ -4241,7 +4244,7 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
 
   // O PREÇO É DA TURMA DELE, NÃO O MAIS BARATO DO EVENTO (20/10/2026).
   //
-  // Isto usava `evento.preco.de`, o menor preço entre as turmas da festa.
+  // Isto usava o menor preço entre as turmas da festa.
   // Enquanto todas as turmas cobram o mesmo, `de` e `ate` são iguais e
   // ninguém nota. Com duas turmas em preços diferentes — que é o caso de
   // qualquer festa compartilhada — a página prometia o preço da turma mais
@@ -4252,7 +4255,7 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
   // consulta falhar, a página volta ao preço da festa só para não ficar sem
   // nada na tela — e a conta verdadeira ainda aparece antes de pagar, porque
   // a tela de pagamento mostra o que o servidor devolveu.
-  compraEvento.unitario = evento.preco ? evento.preco.de : 0;
+  compraEvento.unitario = evento.preco ?? 0;
   try {
     const previa = await pedirComAcesso(`/${encodeURIComponent(tokenDoEvento)}/simular`, {
       method: 'POST',
