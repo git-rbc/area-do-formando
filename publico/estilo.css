@@ -1210,3 +1210,76 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
   padding: 12px; margin: 4px 0 10px; background: var(--papel);
   max-height: 150px; overflow-y: auto;
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   A PORTARIA (22/10/2026)
+
+   Tela de celular segurado com uma mão, à noite, com fila na frente. Daí as
+   escolhas: alvo de toque grande (não se acerta um link de 14px na pressa),
+   contraste alto, e o nome antes de tudo — é o que a pessoa diz na porta.
+
+   Sem fundo escuro: a tela clara é a que se lê de relance num salão mal
+   iluminado, e é a mesma identidade do resto do site.
+   ────────────────────────────────────────────────────────────────────────── */
+#app.portaria {
+  display: block; max-width: 760px; margin: 0 auto; padding: 14px 14px 40px;
+  background: var(--fundo); min-height: 100vh;
+}
+
+.portaria-topo {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--linha); margin-bottom: 12px;
+}
+.portaria-festa { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px; line-height: 1.15; }
+.portaria-sub { font-size: 12px; color: var(--texto-suave); margin-top: 2px; }
+.portaria-placar { text-align: right; white-space: nowrap; font-size: 13px; color: var(--texto-suave); }
+.portaria-placar b { display: block; font-size: 26px; color: var(--accent-txt); line-height: 1; }
+.portaria-ok { display: block; font-size: 10.5px; color: var(--texto-suave); }
+.portaria-pendente { display: block; font-size: 10.5px; color: var(--gold-txt); font-weight: 600; }
+
+.portaria-busca { display: flex; gap: 8px; margin-bottom: 12px; }
+.portaria-busca input {
+  flex: 1; min-width: 0; padding: 13px 14px; font-size: 16px;  /* 16px: abaixo disso o iPhone dá zoom ao focar */
+  border: 1px solid var(--linha); border-radius: 10px; background: var(--papel); color: var(--texto);
+}
+.portaria-busca .botao { width: auto; white-space: nowrap; padding: 13px 14px; font-size: .64rem; }
+
+.portaria-aviso {
+  border-left: 2px solid var(--gold); padding: 8px 0 8px 14px; margin-bottom: 12px;
+  font-size: 12.5px; line-height: 1.45; color: var(--texto-suave);
+}
+
+.portaria-lista { display: flex; flex-direction: column; gap: 6px; }
+
+/* Botão de linha inteira: o alvo é a linha, não um ícone. */
+.portaria-pessoa {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 12px 14px; border: 1px solid var(--linha); border-radius: 12px;
+  background: var(--papel); color: var(--texto); cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.portaria-pessoa:active { transform: translateY(1px); }
+.portaria-pessoa.dentro { background: rgba(123, 78, 194, .07); border-color: var(--violet); }
+
+.marca-check {
+  flex: 0 0 28px; height: 28px; border-radius: 50%; border: 2px solid var(--linha);
+  display: grid; place-items: center; font-size: 15px; font-weight: 700; color: #fff;
+}
+.portaria-pessoa.dentro .marca-check { background: var(--violet); border-color: var(--violet); }
+
+.portaria-pessoa .quem { min-width: 0; flex: 1; }
+.portaria-pessoa .quem b { display: block; font-size: 16px; line-height: 1.25; }
+.portaria-pessoa .quem small { display: block; font-size: 11.5px; color: var(--texto-suave); margin-top: 1px; }
+.portaria-pessoa .hora {
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-txt); white-space: nowrap;
+}
+
+.portaria-vazio { text-align: center; color: var(--texto-suave); padding: 32px 0; font-size: 14px; }
+
+.portaria-extras { margin-top: 20px; padding-top: 12px; border-top: 1px dashed var(--linha); }
+.portaria-extras-titulo {
+  font-size: .64rem; letter-spacing: .22em; text-transform: uppercase;
+  color: var(--texto-suave); margin-bottom: 8px;
+}
+.portaria-extra { padding: 8px 0; border-bottom: 1px solid var(--linha); font-size: 14px; }
+.portaria-extra small { display: block; font-size: 11.5px; color: var(--texto-suave); }

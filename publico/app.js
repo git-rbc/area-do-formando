@@ -4025,6 +4025,11 @@ async function telaEventoPublico(token) {
   // adaptador o manda em toda a conversa da compra.
   try { sessionStorage.setItem('area-formando:liberacao', token); } catch { /* segue sem guardar */ }
 
+  // O LINK DA PORTARIA ABRE OUTRA TELA (22/10/2026). É a equipe na porta, no
+  // dia da festa, conferindo quem entra — nada a ver com comprar convite. O
+  // tipo vem junto na resposta para não custar uma segunda ida ao servidor.
+  if (evento.tipoDoLink === 'portaria') return telaPortaria(token, evento);
+
   const l = evento.local || {};
   const quando = evento.data ? dataLonga(evento.data) : 'data a confirmar';
   // O PREÇO NÃO APARECE AQUI (21/10/2026).

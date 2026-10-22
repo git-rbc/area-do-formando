@@ -76,6 +76,11 @@ const api = [
   fs.readFileSync(path.join(RAIZ, 'publico', 'api-crm.js'), 'utf8'),
 ].join('\n');
 const appjs = relativo(fs.readFileSync(path.join(RAIZ, 'publico', 'app.js'), 'utf8'));
+// A PORTARIA vem num arquivo à parte (22/10/2026): ela é outro assunto — a
+// equipe na porta no dia da festa —, e misturá-la no app.js engordaria um
+// arquivo que já passa de quatro mil linhas. Entra DEPOIS do app porque usa
+// `escapar`, `marca` e `baseEventoPublico`, que moram lá.
+const portariajs = relativo(fs.readFileSync(path.join(RAIZ, 'publico', 'portaria.js'), 'utf8'));
 
 // --- página ------------------------------------------------------------------
 // Sem <!doctype>/<html>/<head>/<body>: o publicador embrulha o arquivo.
@@ -106,6 +111,9 @@ ${api}
 </script>
 <script>
 ${appjs}
+</script>
+<script>
+${portariajs}
 </script>
 `;
 

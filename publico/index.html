@@ -32,6 +32,14 @@
        portal passa a ler dados reais — ver api-crm.js. -->
   <script>window.API_URL = window.API_URL || '';</script>
   <script src="/api-crm.js"></script>
-  <script src="/app.js" type="module"></script>
+  <!--
+    SEM `type="module"` (22/10/2026). O app.js não importa nem exporta nada, e
+    como módulo as funções dele ficam no escopo do módulo — invisíveis para o
+    portaria.js, que precisa de `escapar`, `marca` e `baseEventoPublico`.
+    No site publicado os dois já viram script comum dentro do mesmo HTML; isto
+    faz o ambiente local se comportar igual, que é o ponto de testar local.
+  -->
+  <script src="/app.js"></script>
+  <script src="/portaria.js"></script>
 </body>
 </html>
