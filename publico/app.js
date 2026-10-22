@@ -4298,12 +4298,29 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
   // pelo link compartilhado não vê este histórico — ele é do formando, e o
   // servidor recusa; nem se pede.
   compraEvento.jaComprados = [];
+  compraEvento.meusConvites = null;
   if (!compraEvento.comoConvidado) {
     try {
       const feitas = await pedirComAcesso(`/${encodeURIComponent(tokenDoEvento)}/minhas-compras`);
       if (Array.isArray(feitas)) compraEvento.jaComprados = feitas;
     } catch (_) {
       /* sem o histórico a compra continua possível */
+    }
+
+    // OS CONVITES QUE ELE TEM, venham de onde vierem (22/10/2026).
+    //
+    // "Você já tem ingresso" lê as COMPRAS feitas aqui, e por isso aparecia
+    // vazio para quem tem convite lançado na adesão pela equipe — 16
+    // formandos e 30 convites só na festa de 13/11. Eles abriam o link e não
+    // viam nada do que já tinham.
+    //
+    // Isto vem do contrato, não da compra: é a mesma conta do portal, e é o
+    // que diz quantos nomes faltam.
+    try {
+      const festas = await pedirComAcesso(`/${encodeURIComponent(tokenDoEvento)}/meus-convites`);
+      compraEvento.meusConvites = Array.isArray(festas) ? (festas[0] ?? null) : null;
+    } catch (_) {
+      /* sem isto a tela segue, só sem o bloco de nomear */
     }
   }
 
@@ -4453,9 +4470,40 @@ function telaComprarIngresso(erro) {
           ${e.local?.nome ? ` · ${escapar(e.local.nome)}` : ''}
         </p>
 
+        ${/*
+          OS CONVITES QUE ELE TEM, com os nomes que faltam (22/10/2026).
+
+          Vem do contrato, não da compra: quem teve o convite lançado na
+          adesão pela equipe não aparecia em lugar nenhum desta tela, e não
+          tinha como informar quem usa cada um.
+        */''}
+        ${compraEvento.meusConvites && compraEvento.meusConvites.convites > 0 ? `
+          <div class="ja-comprados">
+            <div class="ja-titulo">Seus convites nesta festa</div>
+            <div class="convites-conta">
+              <b>${compraEvento.meusConvites.convites}</b> convite(s)
+              ${compraEvento.meusConvites.faltam > 0
+                ? `· <span class="falta-nome">${compraEvento.meusConvites.faltam} sem nome</span>`
+                : '· todos nomeados'}
+            </div>
+            ${(compraEvento.meusConvites.nomes || []).length ? `
+              <div class="convites-nomes">
+                ${compraEvento.meusConvites.nomes.map((n) => `<div class="ja-ingresso"><span>${escapar(n.nome)}</span></div>`).join('')}
+              </div>` : ''}
+            <button type="button" class="botao secundario" id="nomear" style="margin-top:10px">
+              ${compraEvento.meusConvites.faltam > 0 ? 'Dizer quem usa cada convite' : 'Mudar os nomes'}
+            </button>
+            ${compraEvento.meusConvites.janela && compraEvento.meusConvites.janela.fechaEm ? `
+              <p class="rodape-nota" style="margin-top:8px">
+                A lista fecha em ${escapar(dataCurta(compraEvento.meusConvites.janela.fechaEm))}, quando a equipe
+                fecha o número com a portaria.
+              </p>` : ''}
+          </div>
+        ` : ''}
+
         ${(compraEvento.jaComprados || []).length ? `
           <div class="ja-comprados">
-            <div class="ja-titulo">Você já tem ingresso nesta festa</div>
+            <div class="ja-titulo">Ingressos comprados por aqui</div>
             ${compraEvento.jaComprados.map((c) => `
               <div class="ja-compra">
                 <div class="ja-protocolo">Protocolo ${escapar(c.protocolo)}</div>
@@ -4518,6 +4566,7 @@ function telaComprarIngresso(erro) {
   });
 
   app.querySelector('#compartilhar')?.addEventListener('click', () => telaCompartilhar());
+  app.querySelector('#nomear')?.addEventListener('click', () => telaNomearConvites());
 
   app.querySelector('#menos').addEventListener('click', () => {
     if (compraEvento.quantidade > 1) compraEvento.quantidade--;
@@ -4534,6 +4583,86 @@ function telaComprarIngresso(erro) {
     }),
   );
   app.querySelector('#seguir').addEventListener('click', () => telaNomesDosIngressos());
+}
+
+/**
+ * QUEM USA CADA CONVITE (22/10/2026).
+ *
+ * Antes isto só existia dentro da compra pela página (os nomes vão junto) e
+ * no portal completo, que não foi liberado aos alunos. Quem teve o convite
+ * lançado na adesão pela equipe não tinha como informar os nomes de jeito
+ * nenhum — eles chegariam por WhatsApp, um a um, para alguém digitar.
+ *
+ * A lista é gravada INTEIRA, como no portal: a tela manda os campos todos, e
+ * o servidor troca a lista da festa. Um "só o que mudou" teria de adivinhar
+ * qual campo é qual convite, e o formando reordena os nomes o tempo todo.
+ *
+ * Campo em branco não vira convidado sem nome: ele simplesmente fica para
+ * depois, e a tela diz quantos faltam.
+ */
+function telaNomearConvites(erro) {
+  const f = compraEvento.meusConvites;
+  if (!f) return telaComprarIngresso();
+
+  const quantos = f.convites;
+  const atuais = (f.nomes || []).map((n) => ({ nome: n.nome ?? '', documento: n.documento ?? '' }));
+  while (atuais.length < quantos) atuais.push({ nome: '', documento: '' });
+
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(compraEvento.evento.nome)}</div>
+        <h1>Quem usa cada <span class="grifo">convite</span></h1>
+        <p class="sub">
+          Você tem ${quantos} convite(s) nesta festa. Escreva o nome de quem vai usar cada um — é por ele que a
+          portaria deixa entrar. Pode deixar em branco e voltar depois.
+        </p>
+
+        <form id="form-nomes" novalidate>
+          ${atuais.map((n, i) => `
+            <div class="campo">
+              <label for="n${i}">Convite ${i + 1}</label>
+              <input id="n${i}" data-nome="${i}" autocomplete="off" placeholder="nome completo"
+                     value="${escapar(n.nome)}" />
+              <input id="d${i}" data-doc="${i}" autocomplete="off" placeholder="documento (opcional)"
+                     value="${escapar(n.documento)}" style="margin-top:6px" />
+            </div>`).join('')}
+          ${erro ? `<p class="erro">${escapar(erro)}</p>` : ''}
+          <button class="botao" type="submit">Salvar a lista</button>
+        </form>
+        <button class="botao secundario" id="voltar" style="margin-top:10px">Voltar</button>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelector('#voltar').addEventListener('click', () => telaComprarIngresso());
+
+  app.querySelector('#form-nomes').addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const nomes = [];
+    for (let i = 0; i < quantos; i++) {
+      const nome = app.querySelector(`[data-nome="${i}"]`).value.trim();
+      if (!nome) continue;
+      nomes.push({ nome, documento: app.querySelector(`[data-doc="${i}"]`).value.trim() || null });
+    }
+
+    const botao = app.querySelector('button[type=submit]');
+    botao.disabled = true;
+    botao.textContent = 'Salvando…';
+    try {
+      const festas = await pedirComAcesso(`/${encodeURIComponent(compraEvento.token)}/meus-convites`, {
+        method: 'PUT',
+        body: JSON.stringify({ nomes }),
+      });
+      compraEvento.meusConvites = Array.isArray(festas) ? (festas[0] ?? compraEvento.meusConvites) : compraEvento.meusConvites;
+      avisar(nomes.length ? 'Lista salva' : 'Lista limpa');
+      telaComprarIngresso();
+    } catch (e) {
+      telaNomearConvites(e.message);
+    }
+  });
 }
 
 /**

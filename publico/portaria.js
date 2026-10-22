@@ -22,8 +22,18 @@
 
    O que esta tela NÃO faz: vender, alterar cadastro, mostrar contrato. O link
    da portaria abre isto e só isto.
+
+   TUDO DENTRO DE UMA FUNÇÃO (22/10/2026). Este arquivo e o app.js viram
+   scripts comuns no mesmo HTML, então dividem o escopo global — e `guardar` e
+   `recuperar`, que aqui são da portaria, já existiam lá como atalhos do
+   sessionStorage. Redeclarar derrubava o arquivo inteiro na hora de carregar:
+   a página ficava em "Carregando a festa…" para sempre, e o app.js chamava
+   uma `telaPortaria` que nunca tinha sido definida.
+
+   Lá fora só aparece `telaPortaria`, que é o que o app.js chama.
    ─────────────────────────────────────────────────────────────────────────── */
 
+(function () {
 const PORTARIA = {
   /** A chave de quem está marcado, no aparelho. */
   entradas: new Map(),
@@ -33,6 +43,8 @@ const PORTARIA = {
   token: null,
   busca: '',
   subindo: false,
+  /** O aviso dos convites sem nome está aberto? Nasce fechado. */
+  verSemNome: false,
 };
 
 const chaveGuardada = (token) => `portaria:${token}`;
@@ -175,6 +187,7 @@ function desenharPortaria() {
     : todas;
 
   const dentro = todas.filter((p) => PORTARIA.entradas.has(p.chave)).length;
+  const semNomeTotal = (l.semNome ?? []).reduce((soma, sn) => soma + sn.quantos, 0);
   const extras = (l.extras ?? []).length + [...PORTARIA.fila.values()].filter((v) => v.extra).length;
 
   app.className = 'portaria';
@@ -201,9 +214,22 @@ function desenharPortaria() {
 
     ${(l.semNome ?? []).length ? `
       <div class="portaria-aviso">
-        Há convite comprado e ainda sem nome:
-        ${(l.semNome ?? []).map((s) => `${escapar(s.formando)} (${s.quantos})`).join(' · ')}.
-        Quem chegar dizendo ser convidado de um deles não vai estar na lista.
+        <button type="button" class="aviso-cabeca" id="abrir-sem-nome" aria-expanded="${PORTARIA.verSemNome}">
+          <span>
+            <b>${semNomeTotal} convite(s) sem nome</b>, de ${(l.semNome ?? []).length} formando(s).
+            Quem chegar dizendo ser convidado de um deles não vai estar na lista.
+          </span>
+          <span class="aviso-seta">${PORTARIA.verSemNome ? 'ocultar' : 'ver quais'}</span>
+        </button>
+        ${PORTARIA.verSemNome ? `
+          <div class="aviso-nomes">
+            ${(l.semNome ?? []).map((sn) => `
+              <div class="aviso-nome">
+                <span>${escapar(sn.formando)}</span>
+                <small>${escapar(sn.turma ?? '')}</small>
+                <b>${sn.quantos}</b>
+              </div>`).join('')}
+          </div>` : ''}
       </div>` : ''}
 
     <div class="portaria-lista">
@@ -255,6 +281,13 @@ function desenharPortaria() {
   });
 
   app.querySelector('#fora-da-lista').addEventListener('click', () => telaForaDaLista());
+
+  // O aviso nasce fechado: é informação de apoio, e aberta ela empurrava a
+  // lista — que é o que a pessoa veio ver — para baixo da dobra.
+  app.querySelector('#abrir-sem-nome')?.addEventListener('click', () => {
+    PORTARIA.verSemNome = !PORTARIA.verSemNome;
+    desenharPortaria();
+  });
 }
 
 /**
@@ -345,3 +378,7 @@ window.addEventListener('online', () => escoarFila());
 // E de tempos em tempos, porque "online" mente em wi-fi de salão: o aparelho
 // diz que está conectado antes de a rede realmente responder.
 setInterval(() => escoarFila(), 20000);
+
+// A única porta para fora. O app.js chama isto quando o link é de portaria.
+window.telaPortaria = telaPortaria;
+})();

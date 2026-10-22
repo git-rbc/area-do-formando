@@ -82,6 +82,27 @@ const appjs = relativo(fs.readFileSync(path.join(RAIZ, 'publico', 'app.js'), 'ut
 // `escapar`, `marca` e `baseEventoPublico`, que moram lá.
 const portariajs = relativo(fs.readFileSync(path.join(RAIZ, 'publico', 'portaria.js'), 'utf8'));
 
+// OS TRÊS DIVIDEM O ESCOPO GLOBAL (22/10/2026).
+//
+// No HTML eles são três <script> comuns, e um `const` repetido entre dois
+// deles derruba o segundo INTEIRO na hora de carregar — sem erro visível na
+// tela, só uma página que não sai do "Carregando…". Foi o que aconteceu com
+// `guardar` e `recuperar`, que existiam no app.js e na portaria.
+//
+// Juntar e pedir ao Node para analisar é a mesma conta que o navegador faz, e
+// custa milissegundos. Melhor descobrir aqui do que no celular da portaria.
+try {
+  new Function(`${api}
+${appjs}
+${portariajs}`);
+} catch (e) {
+  console.error('');
+  console.error('✖ Os scripts do site nao convivem no mesmo escopo:');
+  console.error(`  ${e.message}`);
+  console.error('  (dois arquivos declarando o mesmo nome no topo: renomeie ou isole num IIFE)');
+  process.exit(1);
+}
+
 // --- página ------------------------------------------------------------------
 // Sem <!doctype>/<html>/<head>/<body>: o publicador embrulha o arquivo.
 const html = `<title>Área do Formando</title>
