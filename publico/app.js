@@ -4058,17 +4058,30 @@ async function telaEventoPublico(token) {
             <b>Para entrar:</b> ${escapar(evento.regrasEntrada)}
           </div></div>` : ''}
 
+        ${/*
+          AS COMPRAS ENCERRARAM, O LINK CONTINUA (22/10/2026).
+
+          O prazo do link passou a valer para a COMPRA, não para o endereço:
+          quem comprou precisa abrir o mesmo link no dia da festa para mostrar
+          o ingresso na porta. Então a tela muda de função em vez de morrer —
+          o botão deixa de prometer uma compra que o servidor vai recusar.
+        */''}
         <button class="botao" id="comprar" style="margin-top:14px">
-          ${evento.convidadoDe ? 'Comprar o convite' : 'Comprar meu convite'}
+          ${evento.podeComprar === false
+            ? 'Ver meu ingresso'
+            : (evento.convidadoDe ? 'Comprar o convite' : 'Comprar meu convite')}
         </button>
 
         <p class="rodape-nota" style="margin-top:10px">
-          ${evento.convidadoDe
-            ? `Este link foi compartilhado por <b>${escapar(evento.convidadoDe)}</b> e vale por mais
-               ${escapar(horasLegiveis(evento.horasRestantes))}. O convite que você comprar fica no nome que você
-               informar, como convidado de ${escapar(evento.convidadoDe)} — não é preciso CPF.`
-            : `Este link vale por mais ${escapar(horasLegiveis(evento.horasRestantes))} e foi liberado para você pela
-               equipe. Para comprar, confirmamos o seu CPF com um código — o convite entra no seu contrato.`}
+          ${evento.podeComprar === false
+            ? `As compras para esta festa se encerraram${evento.compraAte ? ` em ${escapar(dataCurta(evento.compraAte))}` : ''}.
+               Você ainda pode entrar com o seu CPF para ver os ingressos que já comprou e apresentá-los na entrada.`
+            : evento.convidadoDe
+              ? `Este link foi compartilhado por <b>${escapar(evento.convidadoDe)}</b> e vale por mais
+                 ${escapar(horasLegiveis(evento.horasRestantes))}. O convite que você comprar fica no nome que você
+                 informar, como convidado de ${escapar(evento.convidadoDe)} — não é preciso CPF.`
+              : `Este link vale por mais ${escapar(horasLegiveis(evento.horasRestantes))} e foi liberado para você pela
+                 equipe. Para comprar, confirmamos o seu CPF com um código — o convite entra no seu contrato.`}
         </p>
       </div>
       ${notaRodape()}
@@ -4289,7 +4302,51 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
     }
   }
 
+  // COMPRA ENCERRADA: a tela de escolher quantidade não tem o que oferecer.
+  // Quem entra agora está atrás do que já comprou.
+  if (compraEvento.evento?.podeComprar === false) return telaMeusIngressos();
+
   telaComprarIngresso();
+}
+
+/**
+ * Os ingressos que a pessoa já tem, quando a compra desta festa já encerrou.
+ *
+ * É a tela que o link passa a mostrar depois do prazo: o endereço continua
+ * vivo justamente para isto — abrir no dia da festa e apresentar na porta.
+ */
+function telaMeusIngressos() {
+  const tem = (compraEvento.jaComprados || []).length;
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(compraEvento.evento.nome)}</div>
+        <h1>${tem ? 'Seus <span class="grifo">ingressos</span>' : 'Compras <span class="grifo">encerradas</span>'}</h1>
+        <p class="sub">
+          ${tem
+            ? 'Apresente na entrada, impresso ou na tela do celular.'
+            : 'As compras para esta festa já se encerraram e você não tem ingresso comprado por aqui. Fale com a equipe da sua formatura.'}
+        </p>
+
+        ${(compraEvento.jaComprados || []).map((c) => `
+          <div class="ja-compra">
+            <div class="ja-protocolo">Protocolo ${escapar(c.protocolo)}</div>
+            ${(c.ingressos || []).map((i) => `
+              <div class="ja-ingresso">
+                <span>${escapar(i.convidado || 'sem nome')}</span>
+                <code>${escapar(i.codigo || '')}</code>
+              </div>`).join('')}
+            <button type="button" class="link-inline" data-ver="${escapar(c.compraId || '')}">ver e baixar o ingresso</button>
+          </div>`).join('')}
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelectorAll('[data-ver]').forEach((b) => {
+    b.addEventListener('click', () => telaIngressoDoEvento(b.getAttribute('data-ver')));
+  });
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
