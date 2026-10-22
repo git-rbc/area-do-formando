@@ -179,7 +179,7 @@ function desenharPortaria() {
   const pessoas = termo
     ? todas.filter(
         (p) =>
-          p.nome.toLowerCase().includes(termo) ||
+          (p.nome ?? '').toLowerCase().includes(termo) ||
           (p.de ?? '').toLowerCase().includes(termo) ||
           (p.documento ?? '').includes(termo) ||
           (p.codigo ?? '').toLowerCase().includes(termo),
@@ -239,10 +239,18 @@ function desenharPortaria() {
         <button type="button" class="portaria-pessoa ${dentroAgora ? 'dentro' : ''}" data-chave="${escapar(p.chave)}">
           <span class="marca-check">${dentroAgora ? '✓' : ''}</span>
           <span class="quem">
-            <b>${escapar(p.nome)}</b>
+            ${/*
+              O CONVITE SEM NOME tem linha, mas não tem nome para mostrar —
+              ninguém o informou. Inventar "convidado 1" encheria a lista de
+              dado falso; o que identifica na porta é de quem ele é.
+            */''}
+            ${p.tipo === 'semnome'
+              ? `<b class="sem-nome">Convidado de ${escapar(p.de ?? '')}</b>`
+              : `<b>${escapar(p.nome)}</b>`}
             <small>
               ${p.tipo === 'formando' ? `formando · ${escapar(p.turma ?? '')}`
                 : p.tipo === 'avulso' ? `convite avulso${p.turma ? ` · ${escapar(p.turma)}` : ''}`
+                : p.tipo === 'semnome' ? `convite sem nome · ${escapar(p.turma ?? '')}`
                 : `convidado de ${escapar(p.de ?? '')}`}
               ${p.documento ? ` · ${escapar(p.documento)}` : ''}
               ${p.codigo ? ` · ${escapar(p.codigo)}` : ''}
