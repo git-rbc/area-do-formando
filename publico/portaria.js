@@ -424,6 +424,7 @@ function desenharPortaria() {
     <div class="portaria-acoes">
       <button type="button" class="botao secundario" id="fora-da-lista">Não está na lista</button>
       <button type="button" class="botao secundario" id="imprimir">Imprimir a lista</button>
+      <button type="button" class="botao secundario" id="historico">Histórico</button>
       <button type="button" class="botao secundario" id="relatorio">Fechar a noite</button>
     </div>
 
@@ -529,6 +530,7 @@ function desenharPortaria() {
 
   app.querySelector('#fora-da-lista').addEventListener('click', () => telaForaDaLista());
   app.querySelector('#imprimir').addEventListener('click', () => imprimirALista());
+  app.querySelector('#historico').addEventListener('click', () => telaHistorico());
   app.querySelector('#relatorio').addEventListener('click', () => telaRelatorio());
 
   // Trocar quem está na porta acontece: a equipe se rende em turnos.
@@ -563,9 +565,17 @@ async function marcar(chave) {
     desenharPortaria();
     try {
       const base = baseEventoPublico();
-      await fetch(`${base}/${encodeURIComponent(PORTARIA.token)}/portaria/entradas/${encodeURIComponent(chave)}`, {
-        method: 'DELETE',
-      });
+      // QUEM DESMARCOU VAI JUNTO (23/10/2026). É a ação que mais gera dúvida
+      // no dia seguinte — "essa pessoa entrou ou foi desmarcada por engano?"
+      // —, e sem o autor o histórico responde metade da pergunta.
+      //
+      // Na query e não no corpo: DELETE com corpo atravessa proxy e
+      // biblioteca sem garantia nenhuma.
+      const quem = encodeURIComponent(PORTARIA.operador ?? '');
+      await fetch(
+        `${base}/${encodeURIComponent(PORTARIA.token)}/portaria/entradas/${encodeURIComponent(chave)}?por=${quem}`,
+        { method: 'DELETE' },
+      );
     } catch {
       // Sem sinal: a próxima atualização da lista traz a verdade do servidor.
     }
@@ -866,6 +876,71 @@ function imprimirALista() {
     </div>`;
 
   abrirParaImprimir(folhaDeImpressao('Lista da portaria', corpo));
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   O HISTÓRICO DE EDIÇÕES (23/10/2026)
+
+   A lista diz quem ESTÁ dentro. Não dizia o que foi feito: desmarcar apaga
+   a linha, e com ela o fato de que alguém chegou a ser marcado. Com três
+   pessoas conferindo ao mesmo tempo, "fulano entrou ou foi desmarcado por
+   engano?" não tinha resposta.
+
+   Do mais recente para o mais antigo, que é a ordem em que a dúvida
+   aparece — quase sempre se procura o que acabou de acontecer.
+   ────────────────────────────────────────────────────────────────────────── */
+
+const ROTULO_DA_ACAO = {
+  entrou: 'entrou',
+  desfez: 'desmarcado',
+  fora_da_lista: 'fora da lista',
+};
+
+async function telaHistorico() {
+  app.className = 'entrar';
+  app.innerHTML = `<div class="entrar-caixa">${marca()}<div class="cartao"><div class="vazio">Buscando o histórico…</div></div></div>`;
+
+  let atos;
+  try {
+    atos = await pedirEventoPublico(`/${encodeURIComponent(PORTARIA.token)}/portaria/historico`);
+  } catch (e) {
+    app.innerHTML = `<div class="entrar-caixa">${marca()}<div class="cartao">
+      <h1>Não <span class="grifo">carregou</span></h1>
+      <p class="sub">${escapar(e.message)} O histórico precisa de internet — a conferência na porta, não.</p>
+      <button class="botao" id="voltar">Voltar para a lista</button>
+    </div></div>`;
+    app.querySelector('#voltar').addEventListener('click', () => desenharPortaria());
+    return;
+  }
+
+  const lista = Array.isArray(atos) ? atos : [];
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(PORTARIA.lista?.evento?.nome ?? 'Portaria')}</div>
+        <h1>O que foi <span class="grifo">feito</span></h1>
+        <p class="sub">
+          ${lista.length
+            ? `${lista.length} registro(s), do mais recente para o mais antigo.`
+            : 'Nada foi marcado ainda nesta festa.'}
+        </p>
+
+        ${lista.map((a) => `
+          <div class="hist-linha">
+            <span class="hist-hora">${escapar(horaDaEntrada(a.em))}</span>
+            <span class="hist-quem">
+              <b>${escapar(a.nome || 'sem nome')}</b>
+              <small>${escapar(ROTULO_DA_ACAO[a.acao] ?? a.acao)}${a.por ? ` · ${escapar(a.por)}` : ''}</small>
+            </span>
+          </div>`).join('')}
+
+        <button class="botao" id="voltar" style="margin-top:14px">Voltar para a lista</button>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelector('#voltar').addEventListener('click', () => desenharPortaria());
 }
 
 /* ───────────────────────────────────────────────────────────────────────────

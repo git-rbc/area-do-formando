@@ -1405,6 +1405,19 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
   text-transform: uppercase; color: var(--texto-suave);
 }
 
+/* O histórico: hora à esquerda, o que aconteceu à direita. */
+.hist-linha {
+  display: flex; gap: 10px; align-items: baseline;
+  padding: 7px 0; border-bottom: 1px solid var(--linha);
+}
+.hist-hora {
+  flex: 0 0 42px; font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px; color: var(--texto-suave);
+}
+.hist-quem { min-width: 0; flex: 1; }
+.hist-quem b { display: block; font-size: 14px; line-height: 1.25; }
+.hist-quem small { display: block; font-size: 11px; color: var(--texto-suave); margin-top: 1px; }
+
 .rel-pico { margin-top: 6px; }
 .pico-barra { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; }
 .pico-hora {
