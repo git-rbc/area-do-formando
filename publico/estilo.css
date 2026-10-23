@@ -1186,6 +1186,26 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
 .falta-nome { color: var(--gold-txt); font-weight: 600; }
 .convites-nomes { border-top: 1px solid var(--linha); padding-top: 6px; }
 
+/*
+  A TRILHA DA COMPRA (22/10/2026): pago › aditivo assinado › ingresso pronto.
+
+  Três palavras em vez de um rótulo de status, porque a pergunta de quem
+  abre não é "qual é o status" — é "falta o quê". O que já aconteceu fica
+  firme, a etapa atual dourada (a vez é dele) e o que vem depois apagado.
+
+  Sem ícone de certo: numa linha de três passos, o próprio contraste já diz
+  o que passou, e um visto verde ao lado de "pago" parecia confirmação de
+  pagamento emitida por nós.
+*/
+.trilha {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px;
+  margin: 6px 0 8px; font-size: 12px;
+}
+.trilha-passo { color: var(--texto-suave); opacity: .55; }
+.trilha-passo + .trilha-passo::before { content: '›'; margin-right: 8px; opacity: .6; }
+.trilha-passo.feito { opacity: 1; color: var(--texto); }
+.trilha-passo.agora { opacity: 1; color: var(--gold-txt); font-weight: 600; }
+
 .ja-protocolo { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; color: var(--texto-suave); }
 .ja-ingresso {
   display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
@@ -1311,3 +1331,86 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
 }
 .portaria-extra { padding: 8px 0; border-bottom: 1px solid var(--linha); font-size: 14px; }
 .portaria-extra small { display: block; font-size: 11.5px; color: var(--texto-suave); }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   O QUE A PORTA GANHOU EM 22/10/2026
+
+   Quem está na porta (para a entrada ter autor), os filtros com a contagem
+   dentro, a separação por turma, a hora da entrada e o fechamento da noite.
+   Tudo no mesmo traço claro: a tela se lê de relance num salão mal
+   iluminado, e um painel escuro brilharia na mão de quem confere.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* O nome de quem confere, discreto mas clicável: a equipe se rende em turnos. */
+.portaria-eu {
+  margin-top: 6px; padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 11px; color: var(--texto-suave);
+  letter-spacing: .06em; text-align: left;
+}
+.portaria-eu b { color: var(--accent-txt); font-weight: 600; }
+
+.portaria-placar .placar-de { display: block; font-size: 11px; }
+
+/*
+  OS FILTROS SÃO TAMBÉM O PLACAR. Na porta, "faltam 34" vale mais do que um
+  total que não muda a noite inteira — e tocar no número é o atalho para a
+  lista que importa naquele instante.
+*/
+.portaria-filtros { display: flex; gap: 6px; margin-bottom: 10px; }
+.filtro-chip {
+  flex: 1; min-width: 0; padding: 9px 6px; border: 1px solid var(--linha); border-radius: 10px;
+  background: var(--papel); color: var(--texto-suave); cursor: pointer;
+  font: inherit; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; line-height: 1.1;
+}
+.filtro-chip b { font-size: 19px; letter-spacing: 0; color: var(--texto); }
+.filtro-chip.ativo { border-color: var(--violet); background: rgba(123, 78, 194, .07); color: var(--accent-txt); }
+.filtro-chip.ativo b { color: var(--accent-txt); }
+
+.portaria-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.portaria-acoes .botao {
+  width: auto; flex: 1; min-width: 132px; white-space: nowrap;
+  padding: 11px 10px; font-size: .6rem;
+}
+
+/* A faixa da turma: quatro turmas na mesma porta, e a produção fecha com cada uma. */
+.portaria-turma {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin: 14px 2px 2px; font-size: 10px; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--texto-suave);
+}
+.portaria-turma:first-child { margin-top: 2px; }
+.portaria-turma small { letter-spacing: .04em; color: var(--accent-txt); font-weight: 600; }
+
+/* A hora da entrada manda, e quem marcou vai embaixo, menor. */
+.portaria-pessoa .hora { text-align: right; }
+.portaria-pessoa .hora small {
+  display: block; margin-top: 2px; font-size: 9.5px; letter-spacing: .04em;
+  text-transform: none; color: var(--texto-suave);
+}
+
+/* ---------- o fechamento da noite ---------- */
+.rel-numeros {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px;
+  background: var(--linha); border: 1px solid var(--linha); border-radius: 10px;
+  overflow: hidden; margin: 14px 0 6px;
+}
+@media (min-width: 420px) {
+  .rel-numeros { grid-template-columns: repeat(4, 1fr); }
+}
+.rel-numeros > div { background: var(--papel); padding: 12px 8px; text-align: center; }
+.rel-numeros b { display: block; font-size: 24px; line-height: 1; color: var(--accent-txt); }
+.rel-numeros span {
+  display: block; margin-top: 4px; font-size: 9.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--texto-suave);
+}
+
+.rel-pico { margin-top: 6px; }
+.pico-barra { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; }
+.pico-hora {
+  flex: 0 0 42px; font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px; color: var(--texto-suave);
+}
+.pico-trilho { flex: 1; height: 8px; border-radius: 4px; background: var(--linha); overflow: hidden; }
+.pico-trilho i { display: block; height: 100%; background: var(--violet); }
+.pico-barra b { flex: 0 0 24px; text-align: right; color: var(--accent-txt); }

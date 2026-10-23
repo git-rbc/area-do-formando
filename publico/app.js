@@ -44,6 +44,28 @@ const esquecer = () => { try { sessionStorage.removeItem('formando_token'); } ca
 const brl = (v) => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dataCurta = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
 const dataLonga = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
+/**
+ * A DATA DE UM INSTANTE COMPLETO, no fuso de Brasília (22/10/2026).
+ *
+ * `dataCurta` espera `2026-10-29` e cola `T12:00:00` no fim — com um ISO
+ * inteiro (`2026-10-31T02:59:59+00:00`) isso vira `...+00:00T12:00:00`, que
+ * não é data nenhuma: a tela escrevia "Invalid Date" no prazo da compra.
+ *
+ * E o fuso importa aqui: esse instante é 30/10 às 23:59 em Brasília. Sem
+ * converter, a tela prometeria um dia a mais do que o link dá.
+ */
+const dataDoInstante = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+};
+
 /** A hora de um instante completo (ISO), para "o código vale até 14:35". */
 const horaCurta = (iso) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
 const mesAno = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '—';
@@ -3983,6 +4005,33 @@ async function pedirEventoPublico(caminho, opcoes = {}) {
   return envelope.data ?? envelope;
 }
 
+/**
+ * `21:00:00` → `21h`; `21:30` → `21h30`. Como se escreve num convite.
+ *
+ * Nada a ver com o `horaCurta` do alto do arquivo, que lê um instante ISO
+ * ("o código Pix vale até 14:32"). Aqui a entrada é a hora cadastrada no
+ * evento, sem data nenhuma — e os dois nomes iguais derrubavam o arquivo.
+ */
+function horaDoRelogio(h) {
+  if (!h) return '';
+  const [hh, mm] = String(h).slice(0, 5).split(':');
+  return Number(mm) ? `${Number(hh)}h${mm}` : `${Number(hh)}h`;
+}
+
+/**
+ * O horário da festa inteiro: "21h às 1h".
+ *
+ * Só o começo deixa de pé a dúvida de quem foi convidado — se a festa acaba
+ * à meia-noite ou de manhã. A madrugada não precisa de explicação: quem lê
+ * "21h às 1h" sabe que é a noite seguinte, como em qualquer convite.
+ */
+function faixaDeHorario(inicio, fim) {
+  const a = horaDoRelogio(inicio);
+  if (!a) return '';
+  const b = horaDoRelogio(fim);
+  return b ? `${a} às ${b}` : a;
+}
+
 function horasLegiveis(h) {
   if (h == null) return '';
   if (h < 1) return `${Math.max(1, Math.round(h * 60))} minutos`;
@@ -4050,7 +4099,7 @@ async function telaEventoPublico(token) {
         <div class="kicker">${escapar(evento.rotulo || 'Convite')}</div>
         <h1>${escapar(evento.nome)}</h1>
         <p class="sub">
-          ${escapar(quando)}${evento.hora ? ` · ${escapar(String(evento.hora).slice(0, 5))}` : ''}
+          ${escapar(quando)}${evento.hora ? ` · ${escapar(faixaDeHorario(evento.hora, evento.horaFim))}` : ''}
           ${evento.turmas && evento.turmas.length ? ` · ${escapar(evento.turmas.join(' + '))}` : ''}
         </p>
 
@@ -4062,6 +4111,23 @@ async function telaEventoPublico(token) {
           <div class="faixa" style="margin-top:12px"><div>
             <b>Para entrar:</b> ${escapar(evento.regrasEntrada)}
           </div></div>` : ''}
+
+        ${/*
+          OS DOIS PRAZOS, SEPARADOS (22/10/2026).
+
+          São datas diferentes com consequências diferentes, e a tela mostrava
+          uma só — o link "vale por mais X horas". Quem lê isso entende que
+          tem tempo, deixa o nome do convidado para depois e perde a outra
+          data: 31 dos 33 convites de 13/11 chegaram a uma semana do prazo
+          sem nome nenhum.
+        */''}
+        ${evento.podeComprar !== false && (evento.compraAte || evento.nomearAte) ? `
+          <div style="margin-top:12px">
+            ${evento.compraAte ? `
+              <div class="dado"><span>Comprar até</span><b>${escapar(dataDoInstante(evento.compraAte))}</b></div>` : ''}
+            ${evento.nomearAte ? `
+              <div class="dado"><span>Dizer quem usa cada convite até</span><b>${escapar(dataCurta(evento.nomearAte))}</b></div>` : ''}
+          </div>` : ''}
 
         ${/*
           AS COMPRAS ENCERRARAM, O LINK CONTINUA (22/10/2026).
@@ -4079,7 +4145,7 @@ async function telaEventoPublico(token) {
 
         <p class="rodape-nota" style="margin-top:10px">
           ${evento.podeComprar === false
-            ? `As compras para esta festa se encerraram${evento.compraAte ? ` em ${escapar(dataCurta(evento.compraAte))}` : ''}.
+            ? `As compras para esta festa se encerraram${evento.compraAte ? ` em ${escapar(dataDoInstante(evento.compraAte))}` : ''}.
                Você ainda pode entrar com o seu CPF para ver os ingressos que já comprou e apresentá-los na entrada.`
             : evento.convidadoDe
               ? `Este link foi compartilhado por <b>${escapar(evento.convidadoDe)}</b> e vale por mais
@@ -4275,6 +4341,17 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
   // tentar de novo — melhor isso do que um número que pode estar errado numa
   // tela onde a pessoa vai decidir pagar.
   compraEvento.unitario = null;
+  // POR QUE NÃO DÁ PARA COMPRAR (22/10/2026).
+  //
+  // O servidor já recusava com o motivo certo — "há parcela vencida em
+  // aberto", "complete seus dados" — e esta página jogava a mensagem fora,
+  // caindo na tela genérica de "não conseguimos confirmar o valor". Na festa
+  // de 13/11 isso atinge 29 dos 66 formandos: eles entram, põem o CPF e
+  // leem que o sistema falhou, quando o que falta é quitar um boleto.
+  //
+  // 400 é recusa com explicação; 500 e rede caída não são — essas continuam
+  // na tela de "tente de novo", porque não há nada que a pessoa possa fazer.
+  compraEvento.bloqueio = null;
   try {
     const previa = await pedirComAcesso(`/${encodeURIComponent(tokenDoEvento)}/simular`, {
       method: 'POST',
@@ -4282,8 +4359,8 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
     });
     const linha = (previa.linhas || [])[0];
     if (linha && Number(linha.unitario) > 0) compraEvento.unitario = Number(linha.unitario);
-  } catch (_) {
-    /* sem preço: a tela de compra avisa e oferece tentar de novo */
+  } catch (e) {
+    if (e.status === 400 && e.message) compraEvento.bloqueio = e.message;
   }
 
   // O QUE ELE JÁ COMPROU NESTA FESTA (20/10/2026).
@@ -4337,6 +4414,58 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
  * É a tela que o link passa a mostrar depois do prazo: o endereço continua
  * vivo justamente para isto — abrir no dia da festa e apresentar na porta.
  */
+/**
+ * EM QUE PÉ ESTÁ A COMPRA (22/10/2026).
+ *
+ * Três portas: pagar, assinar o aditivo, o sistema emitir. A página mostrava
+ * só o fim — havia ingresso ou não havia nada —, e quem estava no meio do
+ * caminho via a mesma tela de quem nunca comprou. Daí a conclusão natural de
+ * que o dinheiro se perdeu, que foi a reclamação de 21/10.
+ *
+ * A trilha diz onde a compra está e, quando a vez é dele, o que fazer.
+ */
+function trilhaDaCompra(etapa) {
+  const ordem = ['aguardando_pagamento', 'falta_assinar', 'processando', 'pronto'];
+  const onde = Math.max(0, ordem.indexOf(etapa));
+  const passo = (rotulo, i) =>
+    `<span class="trilha-passo ${onde > i ? 'feito' : onde === i ? 'agora' : ''}">${rotulo}</span>`;
+  return `<div class="trilha">${passo('pago', 0)}${passo('aditivo assinado', 1)}${passo('ingresso pronto', 2)}</div>`;
+}
+
+/**
+ * Uma compra na lista, com a etapa dela.
+ *
+ * OS CÓDIGOS SÓ APARECEM QUANDO A COMPRA ESTÁ PRONTA. O servidor devolve, em
+ * `ingressos`, os convites nomeados da festa inteira — não os desta compra.
+ * Mostrá-los numa compra que ainda não terminou faria parecer resolvida uma
+ * coisa que não está, e é justamente isso que esta tela veio desfazer.
+ */
+function blocoDaCompraDoEvento(c) {
+  const pronta = c.etapa === 'pronto';
+  return `
+    <div class="ja-compra">
+      <div class="ja-protocolo">Protocolo ${escapar(c.protocolo)}</div>
+      ${trilhaDaCompra(c.etapa)}
+      ${pronta
+        ? (c.ingressos || []).map((i) => `
+            <div class="ja-ingresso">
+              <span>${escapar(i.convidado || 'sem nome')}</span>
+              <code>${escapar(i.codigo || '')}</code>
+            </div>`).join('')
+        : ''}
+      ${c.etapa === 'falta_assinar' && c.assinaturaUrl ? `
+        <a class="link-inline" href="${escapar(c.assinaturaUrl)}" target="_blank" rel="noopener">assinar o aditivo agora</a>`
+        : ''}
+      ${c.etapa === 'processando' ? `
+        <p class="rodape-nota">Assinado. O ingresso aparece aqui em alguns minutos.</p>` : ''}
+      ${c.etapa === 'aguardando_pagamento' ? `
+        <p class="rodape-nota">Assim que o pagamento for confirmado, seguimos para a assinatura.</p>` : ''}
+      <button type="button" class="link-inline" data-ver="${escapar(c.compraId || '')}">
+        ${pronta ? 'ver, enviar e baixar o ingresso' : 'acompanhar esta compra'}
+      </button>
+    </div>`;
+}
+
 function telaMeusIngressos() {
   const tem = (compraEvento.jaComprados || []).length;
   app.className = 'entrar';
@@ -4352,16 +4481,7 @@ function telaMeusIngressos() {
             : 'As compras para esta festa já se encerraram e você não tem ingresso comprado por aqui. Fale com a equipe da sua formatura.'}
         </p>
 
-        ${(compraEvento.jaComprados || []).map((c) => `
-          <div class="ja-compra">
-            <div class="ja-protocolo">Protocolo ${escapar(c.protocolo)}</div>
-            ${(c.ingressos || []).map((i) => `
-              <div class="ja-ingresso">
-                <span>${escapar(i.convidado || 'sem nome')}</span>
-                <code>${escapar(i.codigo || '')}</code>
-              </div>`).join('')}
-            <button type="button" class="link-inline" data-ver="${escapar(c.compraId || '')}">ver e baixar o ingresso</button>
-          </div>`).join('')}
+        ${(compraEvento.jaComprados || []).map(blocoDaCompraDoEvento).join('')}
       </div>
       ${notaRodape()}
     </div>`;
@@ -4448,6 +4568,64 @@ function telaPrecoIndisponivel() {
   );
 }
 
+/**
+ * NÃO DÁ PARA COMPRAR — E O MOTIVO (22/10/2026).
+ *
+ * Quase sempre é parcela vencida (cláusula 8.1 do contrato): 29 dos 66
+ * formandos de 13/11 estão nessa situação. A outra causa é cadastro
+ * incompleto. Os dois têm solução, e nenhum dos dois é "tente de novo".
+ *
+ * O QUE ESTA TELA NÃO FAZ é fechar a porta inteira. Quem não pode comprar
+ * ainda pode ter convite do pacote, convite já comprado e nome para
+ * informar — travar isso junto puniria duas vezes pela mesma dívida.
+ */
+function telaCompraBloqueada() {
+  const temConvites = !!(compraEvento.meusConvites && compraEvento.meusConvites.convites > 0);
+  const temIngressos = (compraEvento.jaComprados || []).length > 0;
+
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(compraEvento.evento?.nome ?? 'Convite')}</div>
+        <h1>Compra <span class="grifo">em espera</span></h1>
+        <p class="sub">${escapar(compraEvento.bloqueio)}</p>
+
+        <div class="faixa alerta" style="margin-top:12px"><div>
+          Assim que estiver regularizado, a compra de convites libera sozinha nesta mesma página —
+          não precisa pedir nada à equipe.
+        </div></div>
+
+        ${temConvites ? `
+          <button class="botao" id="nomear" style="margin-top:14px">
+            ${compraEvento.meusConvites.faltam > 0 ? 'Dizer quem usa meus convites' : 'Ver e mudar os nomes'}
+          </button>` : ''}
+        ${temIngressos ? `
+          <button class="botao ${temConvites ? 'secundario' : ''}" id="ver-ingressos" style="margin-top:10px">
+            Ver meus ingressos
+          </button>` : ''}
+        ${/*
+          SEM BOTÃO DE WHATSAPP (decisão do Dani, 22/10/2026).
+
+          A tela diz o que está pendendo e sai do caminho. Quem está em
+          atraso já tem o canal da equipe — e um botão aqui transformaria o
+          aviso num convite a negociar boleto por esta porta, que não é o
+          lugar: esta página vende convite.
+        */''}
+        <p class="rodape-nota" style="margin-top:14px">
+          ${temConvites || temIngressos
+            ? 'Os convites que você já tem continuam valendo, e os nomes podem ser informados aqui.'
+            : 'A equipe da sua formatura resolve a 2ª via do boleto.'}
+        </p>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelector('#nomear')?.addEventListener('click', () => telaNomearConvites());
+  app.querySelector('#ver-ingressos')?.addEventListener('click', () => telaMeusIngressos());
+}
+
 /** Depois do login: escolher quantos convites e como pagar. */
 function telaComprarIngresso(erro) {
   const e = compraEvento.evento;
@@ -4455,7 +4633,12 @@ function telaComprarIngresso(erro) {
   // SEM PREÇO NÃO SE COMPRA (21/10/2026). `unitario` nulo quer dizer que o
   // servidor não respondeu quanto custa o convite da turma dele. Seguir com
   // zero mostraria "R$ 0,00 cada" numa tela onde a pessoa decide pagar.
-  if (compraEvento.unitario == null) return telaPrecoIndisponivel();
+  //
+  // E quando ele disse POR QUE não respondeu, é isso que a pessoa precisa
+  // ler — não "tente de novo", que não resolve um boleto vencido.
+  if (compraEvento.unitario == null) {
+    return compraEvento.bloqueio ? telaCompraBloqueada() : telaPrecoIndisponivel();
+  }
 
   const total = compraEvento.unitario * compraEvento.quantidade;
   app.className = 'entrar';
@@ -4504,16 +4687,7 @@ function telaComprarIngresso(erro) {
         ${(compraEvento.jaComprados || []).length ? `
           <div class="ja-comprados">
             <div class="ja-titulo">Ingressos comprados por aqui</div>
-            ${compraEvento.jaComprados.map((c) => `
-              <div class="ja-compra">
-                <div class="ja-protocolo">Protocolo ${escapar(c.protocolo)}</div>
-                ${(c.ingressos || []).map((i) => `
-                  <div class="ja-ingresso">
-                    <span>${escapar(i.convidado || 'sem nome')}</span>
-                    <code>${escapar(i.codigo || '')}</code>
-                  </div>`).join('')}
-                <button type="button" class="link-inline" data-ver="${escapar(c.compraId || '')}">ver e baixar o ingresso</button>
-              </div>`).join('')}
+            ${compraEvento.jaComprados.map(blocoDaCompraDoEvento).join('')}
           </div>
         ` : ''}
 
@@ -4608,6 +4782,17 @@ function telaNomearConvites(erro) {
   const atuais = (f.nomes || []).map((n) => ({ nome: n.nome ?? '', documento: n.documento ?? '' }));
   while (atuais.length < quantos) atuais.push({ nome: '', documento: '' });
 
+  // O PRAZO NA TELA, NÃO NO FIM DO FORMULÁRIO (22/10/2026).
+  //
+  // Trocar um nome já dado sempre foi permitido até o prazo — e é normal
+  // trocar de convidado em três semanas. Mas a tela não dizia até quando, e
+  // depois da data ela ainda oferecia os campos: a pessoa digitava tudo,
+  // apertava Salvar e só então ouvia "a lista fechou". Agora o aviso vem
+  // antes, e passado o prazo o formulário não aparece — quem precisa trocar
+  // algo fala com a equipe, que pode mexer a qualquer momento.
+  const janela = f.janela || { aberta: true };
+  const fecha = janela.fechaEm ? dataCurta(janela.fechaEm) : null;
+
   app.className = 'entrar';
   app.innerHTML = `
     <div class="entrar-caixa">
@@ -4616,9 +4801,34 @@ function telaNomearConvites(erro) {
         <div class="kicker">${escapar(compraEvento.evento.nome)}</div>
         <h1>Quem usa cada <span class="grifo">convite</span></h1>
         <p class="sub">
-          Você tem ${quantos} convite(s) nesta festa. Escreva o nome de quem vai usar cada um — é por ele que a
-          portaria deixa entrar. Pode deixar em branco e voltar depois.
+          ${janela.aberta
+            ? `Você tem ${quantos} convite(s) nesta festa. Escreva o nome de quem vai usar cada um — é por ele que a
+               portaria deixa entrar. Pode deixar em branco e voltar depois.`
+            : 'A lista desta festa já foi fechada com a produção.'}
         </p>
+
+        ${!janela.aberta ? `
+          <div class="faixa alerta"><div>
+            ${escapar(janela.motivo || 'A lista já fechou.')}
+          </div></div>
+          ${(f.nomes || []).length ? `
+            <div class="ja-comprados" style="margin-top:12px">
+              <div class="ja-titulo">Os nomes que estão na portaria</div>
+              ${(f.nomes || []).map((n) => `
+                <div class="ja-ingresso">
+                  <span>${escapar(n.nome)}</span>
+                  ${n.documento ? `<code>${escapar(n.documento)}</code>` : ''}
+                </div>`).join('')}
+            </div>` : ''}
+          <button class="botao" id="voltar" style="margin-top:14px">Voltar</button>
+        ` : ''}
+
+        ${janela.aberta ? `
+        ${fecha ? `
+          <div class="faixa"><div>
+            Dá para mudar os nomes até <b>${escapar(fecha)}</b>. Depois disso a lista já foi para a portaria e
+            qualquer troca passa a ser com a equipe.
+          </div></div>` : ''}
 
         <form id="form-nomes" novalidate>
           ${atuais.map((n, i) => `
@@ -4633,13 +4843,14 @@ function telaNomearConvites(erro) {
           <button class="botao" type="submit">Salvar a lista</button>
         </form>
         <button class="botao secundario" id="voltar" style="margin-top:10px">Voltar</button>
+        ` : ''}
       </div>
       ${notaRodape()}
     </div>`;
 
   app.querySelector('#voltar').addEventListener('click', () => telaComprarIngresso());
 
-  app.querySelector('#form-nomes').addEventListener('submit', async (ev) => {
+  app.querySelector('#form-nomes')?.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const nomes = [];
     for (let i = 0; i < quantos; i++) {
@@ -4879,6 +5090,70 @@ function telaPagamentoDoEvento(compra, previa) {
 }
 
 /** O ingresso: protocolo, códigos e o PDF. */
+/** O PDF dos ingressos desta compra, como arquivo. */
+async function pdfDaCompra(compraId) {
+  const base = baseEventoPublico();
+  const r = await fetch(`${base}/${encodeURIComponent(compraEvento.token)}/compra/${encodeURIComponent(compraId)}/pdf`, {
+    headers: { authorization: `Bearer ${compraEvento.acesso}` },
+  });
+  if (!r.ok) throw new Error('falha');
+  return r.blob();
+}
+
+/**
+ * MANDAR O INGRESSO PARA QUEM VAI USAR (22/10/2026).
+ *
+ * O convite é comprado pelo formando e usado por outra pessoa. Até aqui o
+ * caminho era baixar o PDF e descobrir sozinho como repassar — num celular,
+ * achar o arquivo baixado para anexar no WhatsApp já é obstáculo.
+ *
+ * Então o envio usa o compartilhamento do próprio aparelho, com o arquivo
+ * anexado: no celular ele abre a lista de contatos do WhatsApp e manda o PDF
+ * direto. Onde isso não existe — navegador de computador, em geral —, o
+ * arquivo é baixado, que é o que dá para fazer ali.
+ *
+ * O servidor não manda por nós de propósito: o convidado não tem e-mail
+ * cadastrado (só nome, documento e telefone), e mandar por WhatsApp exigiria
+ * um modelo de mensagem aprovado pela Meta, que não existe para ingresso.
+ * Quem tem a relação com o convidado é o formando.
+ */
+async function enviarIngresso(compraId, protocolo, festa) {
+  let blob;
+  try {
+    blob = await pdfDaCompra(compraId);
+  } catch {
+    return avisar('Não foi possível gerar o PDF agora');
+  }
+
+  const nome = `ingresso-${protocolo}.pdf`;
+  const arquivo = new File([blob], nome, { type: 'application/pdf' });
+  const texto = `Seu ingresso para ${festa}. Apresente na entrada, impresso ou na tela do celular.`;
+
+  if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+    try {
+      await navigator.share({ files: [arquivo], title: 'Ingresso', text: texto });
+      return;
+    } catch (e) {
+      // Cancelar o compartilhamento não é erro: a pessoa mudou de ideia, e
+      // baixar o arquivo por cima disso seria fazer o que ela desfez.
+      if (e && e.name === 'AbortError') return;
+    }
+  }
+
+  baixarBlob(blob, nome);
+  avisar('Ingresso baixado — anexe no WhatsApp do convidado');
+}
+
+/** Salva um arquivo que já está na mão. */
+function baixarBlob(blob, nome) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nome;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 async function telaIngressoDoEvento(compraId) {
   app.innerHTML = `<div class="entrar-caixa">${marca()}<div class="cartao"><div class="vazio">Buscando seu ingresso…</div></div></div>`;
 
@@ -4911,7 +5186,10 @@ async function telaIngressoDoEvento(compraId) {
       <div class="cartao">
         <div class="kicker">Protocolo ${escapar(c.protocolo)}</div>
         <h1>${pago ? 'Ingresso <span class="grifo">confirmado</span>' : 'Pagamento <span class="grifo">pendente</span>'}</h1>
-        <p class="sub">${escapar(c.festa.nome)} · ${escapar(c.festa.data ? dataLonga(c.festa.data) : 'data a confirmar')}</p>
+        <p class="sub">
+          ${escapar(c.festa.nome)} · ${escapar(c.festa.data ? dataLonga(c.festa.data) : 'data a confirmar')}
+          ${c.festa.hora ? ` · ${escapar(faixaDeHorario(c.festa.hora, c.festa.horaFim))}` : ''}
+        </p>
 
         ${!pago ? `
           <div class="faixa alerta"><div>
@@ -4937,7 +5215,8 @@ async function telaIngressoDoEvento(compraId) {
           </div>`).join('')}
 
         ${temIngresso ? `
-          <button class="botao" id="baixar" style="margin-top:12px">Baixar ingresso em PDF</button>
+          <button class="botao" id="enviar" style="margin-top:12px">Enviar para o convidado</button>
+          <button class="botao secundario" id="baixar" style="margin-top:10px">Baixar em PDF</button>
           <button class="botao secundario" id="comprar-mais" style="margin-top:10px">Comprar outro convite</button>
           <button class="botao secundario" id="atualizar" style="margin-top:10px">Atualizar</button>
         ` : `
@@ -4973,20 +5252,13 @@ async function telaIngressoDoEvento(compraId) {
     telaComprarIngresso();
   });
 
+  app.querySelector('#enviar')?.addEventListener('click', () =>
+    enviarIngresso(compraId, c.protocolo, c.festa.nome),
+  );
+
   app.querySelector('#baixar')?.addEventListener('click', async () => {
     try {
-      const base = baseEventoPublico();
-      const r = await fetch(`${base}/${encodeURIComponent(compraEvento.token)}/compra/${encodeURIComponent(compraId)}/pdf`, {
-        headers: { authorization: `Bearer ${compraEvento.acesso}` },
-      });
-      if (!r.ok) throw new Error('falha');
-      const blob = await r.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `ingresso-${c.protocolo}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      baixarBlob(await pdfDaCompra(compraId), `ingresso-${c.protocolo}.pdf`);
     } catch {
       avisar('Não foi possível gerar o PDF agora');
     }
