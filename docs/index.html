@@ -1201,6 +1201,31 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
   color: var(--texto-suave); margin-bottom: 8px;
 }
 .ja-compra + .ja-compra { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--linha); }
+.convites-conta { font-size: 15px; margin-bottom: 8px; }
+.convites-conta b { font-size: 20px; color: var(--accent-txt); }
+.falta-nome { color: var(--gold-txt); font-weight: 600; }
+.convites-nomes { border-top: 1px solid var(--linha); padding-top: 6px; }
+
+/*
+  A TRILHA DA COMPRA (22/10/2026): pago › aditivo assinado › ingresso pronto.
+
+  Três palavras em vez de um rótulo de status, porque a pergunta de quem
+  abre não é "qual é o status" — é "falta o quê". O que já aconteceu fica
+  firme, a etapa atual dourada (a vez é dele) e o que vem depois apagado.
+
+  Sem ícone de certo: numa linha de três passos, o próprio contraste já diz
+  o que passou, e um visto verde ao lado de "pago" parecia confirmação de
+  pagamento emitida por nós.
+*/
+.trilha {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px;
+  margin: 6px 0 8px; font-size: 12px;
+}
+.trilha-passo { color: var(--texto-suave); opacity: .55; }
+.trilha-passo + .trilha-passo::before { content: '›'; margin-right: 8px; opacity: .6; }
+.trilha-passo.feito { opacity: 1; color: var(--texto); }
+.trilha-passo.agora { opacity: 1; color: var(--gold-txt); font-weight: 600; }
+
 .ja-protocolo { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11.5px; color: var(--texto-suave); }
 .ja-ingresso {
   display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
@@ -1230,6 +1255,185 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
   padding: 12px; margin: 4px 0 10px; background: var(--papel);
   max-height: 150px; overflow-y: auto;
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   A PORTARIA (22/10/2026)
+
+   Tela de celular segurado com uma mão, à noite, com fila na frente. Daí as
+   escolhas: alvo de toque grande (não se acerta um link de 14px na pressa),
+   contraste alto, e o nome antes de tudo — é o que a pessoa diz na porta.
+
+   Sem fundo escuro: a tela clara é a que se lê de relance num salão mal
+   iluminado, e é a mesma identidade do resto do site.
+   ────────────────────────────────────────────────────────────────────────── */
+#app.portaria {
+  display: block; max-width: 760px; margin: 0 auto; padding: 14px 14px 40px;
+  background: var(--fundo); min-height: 100vh;
+}
+
+.portaria-topo {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--linha); margin-bottom: 12px;
+}
+.portaria-festa { font-family: 'Cormorant Garamond', Georgia, serif; font-size: 22px; line-height: 1.15; }
+.portaria-sub { font-size: 12px; color: var(--texto-suave); margin-top: 2px; }
+.portaria-placar { text-align: right; white-space: nowrap; font-size: 13px; color: var(--texto-suave); }
+.portaria-placar b { display: block; font-size: 26px; color: var(--accent-txt); line-height: 1; }
+.portaria-ok { display: block; font-size: 10.5px; color: var(--texto-suave); }
+.portaria-pendente { display: block; font-size: 10.5px; color: var(--gold-txt); font-weight: 600; }
+
+.portaria-busca { display: flex; gap: 8px; margin-bottom: 12px; }
+.portaria-busca input {
+  flex: 1; min-width: 0; padding: 13px 14px; font-size: 16px;  /* 16px: abaixo disso o iPhone dá zoom ao focar */
+  border: 1px solid var(--linha); border-radius: 10px; background: var(--papel); color: var(--texto);
+}
+.portaria-busca .botao { width: auto; white-space: nowrap; padding: 13px 14px; font-size: .64rem; }
+
+.portaria-aviso {
+  border-left: 2px solid var(--gold); padding: 0 0 0 14px; margin-bottom: 12px;
+  font-size: 12.5px; line-height: 1.45; color: var(--texto-suave);
+}
+/*
+  O aviso nasce FECHADO (22/10/2026). Aberto, com dezessete nomes em texto
+  corrido, ele empurrava a lista — que é o que a pessoa veio ver — para baixo
+  da dobra, e ninguém lê um parágrafo com fila na frente.
+*/
+.aviso-cabeca {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
+  padding: 8px 0; color: inherit; font: inherit;
+}
+.aviso-cabeca b { color: var(--gold-txt); }
+.aviso-seta {
+  white-space: nowrap; font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--accent-txt);
+}
+.aviso-nomes { padding-bottom: 10px; }
+.aviso-nome {
+  display: flex; align-items: baseline; gap: 8px; padding: 5px 0;
+  border-top: 1px solid var(--linha); font-size: 13.5px; color: var(--texto);
+}
+.aviso-nome small { color: var(--texto-suave); font-size: 11px; }
+.aviso-nome b { margin-left: auto; color: var(--gold-txt); }
+
+.portaria-lista { display: flex; flex-direction: column; gap: 6px; }
+
+/* Botão de linha inteira: o alvo é a linha, não um ícone. */
+.portaria-pessoa {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 12px 14px; border: 1px solid var(--linha); border-radius: 12px;
+  background: var(--papel); color: var(--texto); cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.portaria-pessoa:active { transform: translateY(1px); }
+.portaria-pessoa.dentro { background: rgba(123, 78, 194, .07); border-color: var(--violet); }
+
+.marca-check {
+  flex: 0 0 28px; height: 28px; border-radius: 50%; border: 2px solid var(--linha);
+  display: grid; place-items: center; font-size: 15px; font-weight: 700; color: #fff;
+}
+.portaria-pessoa.dentro .marca-check { background: var(--violet); border-color: var(--violet); }
+
+.portaria-pessoa .quem { min-width: 0; flex: 1; }
+.portaria-pessoa .quem b { display: block; font-size: 16px; line-height: 1.25; }
+.portaria-pessoa .quem b.sem-nome { color: var(--texto-suave); font-style: italic; }
+.portaria-pessoa .quem small { display: block; font-size: 11.5px; color: var(--texto-suave); margin-top: 1px; }
+.portaria-pessoa .hora {
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-txt); white-space: nowrap;
+}
+
+.portaria-vazio { text-align: center; color: var(--texto-suave); padding: 32px 0; font-size: 14px; }
+
+.portaria-extras { margin-top: 20px; padding-top: 12px; border-top: 1px dashed var(--linha); }
+.portaria-extras-titulo {
+  font-size: .64rem; letter-spacing: .22em; text-transform: uppercase;
+  color: var(--texto-suave); margin-bottom: 8px;
+}
+.portaria-extra { padding: 8px 0; border-bottom: 1px solid var(--linha); font-size: 14px; }
+.portaria-extra small { display: block; font-size: 11.5px; color: var(--texto-suave); }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   O QUE A PORTA GANHOU EM 22/10/2026
+
+   Quem está na porta (para a entrada ter autor), os filtros com a contagem
+   dentro, a separação por turma, a hora da entrada e o fechamento da noite.
+   Tudo no mesmo traço claro: a tela se lê de relance num salão mal
+   iluminado, e um painel escuro brilharia na mão de quem confere.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* O nome de quem confere, discreto mas clicável: a equipe se rende em turnos. */
+.portaria-eu {
+  margin-top: 6px; padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 11px; color: var(--texto-suave);
+  letter-spacing: .06em; text-align: left;
+}
+.portaria-eu b { color: var(--accent-txt); font-weight: 600; }
+
+.portaria-placar .placar-de { display: block; font-size: 11px; }
+
+/*
+  OS FILTROS SÃO TAMBÉM O PLACAR. Na porta, "faltam 34" vale mais do que um
+  total que não muda a noite inteira — e tocar no número é o atalho para a
+  lista que importa naquele instante.
+*/
+.portaria-filtros { display: flex; gap: 6px; margin-bottom: 10px; }
+.filtro-chip {
+  flex: 1; min-width: 0; padding: 9px 6px; border: 1px solid var(--linha); border-radius: 10px;
+  background: var(--papel); color: var(--texto-suave); cursor: pointer;
+  font: inherit; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; line-height: 1.1;
+}
+.filtro-chip b { font-size: 19px; letter-spacing: 0; color: var(--texto); }
+.filtro-chip.ativo { border-color: var(--violet); background: rgba(123, 78, 194, .07); color: var(--accent-txt); }
+.filtro-chip.ativo b { color: var(--accent-txt); }
+
+.portaria-acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.portaria-acoes .botao {
+  width: auto; flex: 1; min-width: 132px; white-space: nowrap;
+  padding: 11px 10px; font-size: .6rem;
+}
+
+/* A faixa da turma: quatro turmas na mesma porta, e a produção fecha com cada uma. */
+.portaria-turma {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin: 14px 2px 2px; font-size: 10px; letter-spacing: .2em; text-transform: uppercase;
+  color: var(--texto-suave);
+}
+.portaria-turma:first-child { margin-top: 2px; }
+.portaria-turma small { letter-spacing: .04em; color: var(--accent-txt); font-weight: 600; }
+
+/* A hora da entrada manda, e quem marcou vai embaixo, menor. */
+.portaria-pessoa .hora { text-align: right; }
+.portaria-pessoa .hora small {
+  display: block; margin-top: 2px; font-size: 9.5px; letter-spacing: .04em;
+  text-transform: none; color: var(--texto-suave);
+}
+
+/* ---------- o fechamento da noite ---------- */
+.rel-numeros {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px;
+  background: var(--linha); border: 1px solid var(--linha); border-radius: 10px;
+  overflow: hidden; margin: 14px 0 6px;
+}
+@media (min-width: 420px) {
+  .rel-numeros { grid-template-columns: repeat(4, 1fr); }
+}
+.rel-numeros > div { background: var(--papel); padding: 12px 8px; text-align: center; }
+.rel-numeros b { display: block; font-size: 24px; line-height: 1; color: var(--accent-txt); }
+.rel-numeros span {
+  display: block; margin-top: 4px; font-size: 9.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--texto-suave);
+}
+
+.rel-pico { margin-top: 6px; }
+.pico-barra { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; }
+.pico-hora {
+  flex: 0 0 42px; font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 11px; color: var(--texto-suave);
+}
+.pico-trilho { flex: 1; height: 8px; border-radius: 4px; background: var(--linha); overflow: hidden; }
+.pico-trilho i { display: block; height: 100%; background: var(--violet); }
+.pico-barra b { flex: 0 0 24px; text-align: right; color: var(--accent-txt); }
 
 </style>
 </head>
@@ -2976,6 +3180,28 @@ const esquecer = () => { try { sessionStorage.removeItem('formando_token'); } ca
 const brl = (v) => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dataCurta = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
 const dataLonga = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
+/**
+ * A DATA DE UM INSTANTE COMPLETO, no fuso de Brasília (22/10/2026).
+ *
+ * `dataCurta` espera `2026-10-29` e cola `T12:00:00` no fim — com um ISO
+ * inteiro (`2026-10-31T02:59:59+00:00`) isso vira `...+00:00T12:00:00`, que
+ * não é data nenhuma: a tela escrevia "Invalid Date" no prazo da compra.
+ *
+ * E o fuso importa aqui: esse instante é 30/10 às 23:59 em Brasília. Sem
+ * converter, a tela prometeria um dia a mais do que o link dá.
+ */
+const dataDoInstante = (iso) => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+};
+
 /** A hora de um instante completo (ISO), para "o código vale até 14:35". */
 const horaCurta = (iso) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '');
 const mesAno = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }) : '—';
@@ -6915,6 +7141,33 @@ async function pedirEventoPublico(caminho, opcoes = {}) {
   return envelope.data ?? envelope;
 }
 
+/**
+ * `21:00:00` → `21h`; `21:30` → `21h30`. Como se escreve num convite.
+ *
+ * Nada a ver com o `horaCurta` do alto do arquivo, que lê um instante ISO
+ * ("o código Pix vale até 14:32"). Aqui a entrada é a hora cadastrada no
+ * evento, sem data nenhuma — e os dois nomes iguais derrubavam o arquivo.
+ */
+function horaDoRelogio(h) {
+  if (!h) return '';
+  const [hh, mm] = String(h).slice(0, 5).split(':');
+  return Number(mm) ? `${Number(hh)}h${mm}` : `${Number(hh)}h`;
+}
+
+/**
+ * O horário da festa inteiro: "21h às 1h".
+ *
+ * Só o começo deixa de pé a dúvida de quem foi convidado — se a festa acaba
+ * à meia-noite ou de manhã. A madrugada não precisa de explicação: quem lê
+ * "21h às 1h" sabe que é a noite seguinte, como em qualquer convite.
+ */
+function faixaDeHorario(inicio, fim) {
+  const a = horaDoRelogio(inicio);
+  if (!a) return '';
+  const b = horaDoRelogio(fim);
+  return b ? `${a} às ${b}` : a;
+}
+
 function horasLegiveis(h) {
   if (h == null) return '';
   if (h < 1) return `${Math.max(1, Math.round(h * 60))} minutos`;
@@ -6957,6 +7210,11 @@ async function telaEventoPublico(token) {
   // adaptador o manda em toda a conversa da compra.
   try { sessionStorage.setItem('area-formando:liberacao', token); } catch { /* segue sem guardar */ }
 
+  // O LINK DA PORTARIA ABRE OUTRA TELA (22/10/2026). É a equipe na porta, no
+  // dia da festa, conferindo quem entra — nada a ver com comprar convite. O
+  // tipo vem junto na resposta para não custar uma segunda ida ao servidor.
+  if (evento.tipoDoLink === 'portaria') return telaPortaria(token, evento);
+
   const l = evento.local || {};
   const quando = evento.data ? dataLonga(evento.data) : 'data a confirmar';
   // O PREÇO NÃO APARECE AQUI (21/10/2026).
@@ -6977,7 +7235,7 @@ async function telaEventoPublico(token) {
         <div class="kicker">${escapar(evento.rotulo || 'Convite')}</div>
         <h1>${escapar(evento.nome)}</h1>
         <p class="sub">
-          ${escapar(quando)}${evento.hora ? ` · ${escapar(String(evento.hora).slice(0, 5))}` : ''}
+          ${escapar(quando)}${evento.hora ? ` · ${escapar(faixaDeHorario(evento.hora, evento.horaFim))}` : ''}
           ${evento.turmas && evento.turmas.length ? ` · ${escapar(evento.turmas.join(' + '))}` : ''}
         </p>
 
@@ -6990,17 +7248,47 @@ async function telaEventoPublico(token) {
             <b>Para entrar:</b> ${escapar(evento.regrasEntrada)}
           </div></div>` : ''}
 
+        ${/*
+          OS DOIS PRAZOS, SEPARADOS (22/10/2026).
+
+          São datas diferentes com consequências diferentes, e a tela mostrava
+          uma só — o link "vale por mais X horas". Quem lê isso entende que
+          tem tempo, deixa o nome do convidado para depois e perde a outra
+          data: 31 dos 33 convites de 13/11 chegaram a uma semana do prazo
+          sem nome nenhum.
+        */''}
+        ${evento.podeComprar !== false && (evento.compraAte || evento.nomearAte) ? `
+          <div style="margin-top:12px">
+            ${evento.compraAte ? `
+              <div class="dado"><span>Comprar até</span><b>${escapar(dataDoInstante(evento.compraAte))}</b></div>` : ''}
+            ${evento.nomearAte ? `
+              <div class="dado"><span>Dizer quem usa cada convite até</span><b>${escapar(dataCurta(evento.nomearAte))}</b></div>` : ''}
+          </div>` : ''}
+
+        ${/*
+          AS COMPRAS ENCERRARAM, O LINK CONTINUA (22/10/2026).
+
+          O prazo do link passou a valer para a COMPRA, não para o endereço:
+          quem comprou precisa abrir o mesmo link no dia da festa para mostrar
+          o ingresso na porta. Então a tela muda de função em vez de morrer —
+          o botão deixa de prometer uma compra que o servidor vai recusar.
+        */''}
         <button class="botao" id="comprar" style="margin-top:14px">
-          ${evento.convidadoDe ? 'Comprar o convite' : 'Comprar meu convite'}
+          ${evento.podeComprar === false
+            ? 'Ver meu ingresso'
+            : (evento.convidadoDe ? 'Comprar o convite' : 'Comprar meu convite')}
         </button>
 
         <p class="rodape-nota" style="margin-top:10px">
-          ${evento.convidadoDe
-            ? `Este link foi compartilhado por <b>${escapar(evento.convidadoDe)}</b> e vale por mais
-               ${escapar(horasLegiveis(evento.horasRestantes))}. O convite que você comprar fica no nome que você
-               informar, como convidado de ${escapar(evento.convidadoDe)} — não é preciso CPF.`
-            : `Este link vale por mais ${escapar(horasLegiveis(evento.horasRestantes))} e foi liberado para você pela
-               equipe. Para comprar, confirmamos o seu CPF com um código — o convite entra no seu contrato.`}
+          ${evento.podeComprar === false
+            ? `As compras para esta festa se encerraram${evento.compraAte ? ` em ${escapar(dataDoInstante(evento.compraAte))}` : ''}.
+               Você ainda pode entrar com o seu CPF para ver os ingressos que já comprou e apresentá-los na entrada.`
+            : evento.convidadoDe
+              ? `Este link foi compartilhado por <b>${escapar(evento.convidadoDe)}</b> e vale por mais
+                 ${escapar(horasLegiveis(evento.horasRestantes))}. O convite que você comprar fica no nome que você
+                 informar, como convidado de ${escapar(evento.convidadoDe)} — não é preciso CPF.`
+              : `Este link vale por mais ${escapar(horasLegiveis(evento.horasRestantes))} e foi liberado para você pela
+                 equipe. Para comprar, confirmamos o seu CPF com um código — o convite entra no seu contrato.`}
         </p>
       </div>
       ${notaRodape()}
@@ -7189,6 +7477,17 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
   // tentar de novo — melhor isso do que um número que pode estar errado numa
   // tela onde a pessoa vai decidir pagar.
   compraEvento.unitario = null;
+  // POR QUE NÃO DÁ PARA COMPRAR (22/10/2026).
+  //
+  // O servidor já recusava com o motivo certo — "há parcela vencida em
+  // aberto", "complete seus dados" — e esta página jogava a mensagem fora,
+  // caindo na tela genérica de "não conseguimos confirmar o valor". Na festa
+  // de 13/11 isso atinge 29 dos 66 formandos: eles entram, põem o CPF e
+  // leem que o sistema falhou, quando o que falta é quitar um boleto.
+  //
+  // 400 é recusa com explicação; 500 e rede caída não são — essas continuam
+  // na tela de "tente de novo", porque não há nada que a pessoa possa fazer.
+  compraEvento.bloqueio = null;
   try {
     const previa = await pedirComAcesso(`/${encodeURIComponent(tokenDoEvento)}/simular`, {
       method: 'POST',
@@ -7196,8 +7495,8 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
     });
     const linha = (previa.linhas || [])[0];
     if (linha && Number(linha.unitario) > 0) compraEvento.unitario = Number(linha.unitario);
-  } catch (_) {
-    /* sem preço: a tela de compra avisa e oferece tentar de novo */
+  } catch (e) {
+    if (e.status === 400 && e.message) compraEvento.bloqueio = e.message;
   }
 
   // O QUE ELE JÁ COMPROU NESTA FESTA (20/10/2026).
@@ -7212,6 +7511,7 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
   // pelo link compartilhado não vê este histórico — ele é do formando, e o
   // servidor recusa; nem se pede.
   compraEvento.jaComprados = [];
+  compraEvento.meusConvites = null;
   if (!compraEvento.comoConvidado) {
     try {
       const feitas = await pedirComAcesso(`/${encodeURIComponent(tokenDoEvento)}/minhas-compras`);
@@ -7219,9 +7519,112 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
     } catch (_) {
       /* sem o histórico a compra continua possível */
     }
+
+    // OS CONVITES QUE ELE TEM, venham de onde vierem (22/10/2026).
+    //
+    // "Você já tem ingresso" lê as COMPRAS feitas aqui, e por isso aparecia
+    // vazio para quem tem convite lançado na adesão pela equipe — 16
+    // formandos e 30 convites só na festa de 13/11. Eles abriam o link e não
+    // viam nada do que já tinham.
+    //
+    // Isto vem do contrato, não da compra: é a mesma conta do portal, e é o
+    // que diz quantos nomes faltam.
+    try {
+      const festas = await pedirComAcesso(`/${encodeURIComponent(tokenDoEvento)}/meus-convites`);
+      compraEvento.meusConvites = Array.isArray(festas) ? (festas[0] ?? null) : null;
+    } catch (_) {
+      /* sem isto a tela segue, só sem o bloco de nomear */
+    }
   }
 
+  // COMPRA ENCERRADA: a tela de escolher quantidade não tem o que oferecer.
+  // Quem entra agora está atrás do que já comprou.
+  if (compraEvento.evento?.podeComprar === false) return telaMeusIngressos();
+
   telaComprarIngresso();
+}
+
+/**
+ * Os ingressos que a pessoa já tem, quando a compra desta festa já encerrou.
+ *
+ * É a tela que o link passa a mostrar depois do prazo: o endereço continua
+ * vivo justamente para isto — abrir no dia da festa e apresentar na porta.
+ */
+/**
+ * EM QUE PÉ ESTÁ A COMPRA (22/10/2026).
+ *
+ * Três portas: pagar, assinar o aditivo, o sistema emitir. A página mostrava
+ * só o fim — havia ingresso ou não havia nada —, e quem estava no meio do
+ * caminho via a mesma tela de quem nunca comprou. Daí a conclusão natural de
+ * que o dinheiro se perdeu, que foi a reclamação de 21/10.
+ *
+ * A trilha diz onde a compra está e, quando a vez é dele, o que fazer.
+ */
+function trilhaDaCompra(etapa) {
+  const ordem = ['aguardando_pagamento', 'falta_assinar', 'processando', 'pronto'];
+  const onde = Math.max(0, ordem.indexOf(etapa));
+  const passo = (rotulo, i) =>
+    `<span class="trilha-passo ${onde > i ? 'feito' : onde === i ? 'agora' : ''}">${rotulo}</span>`;
+  return `<div class="trilha">${passo('pago', 0)}${passo('aditivo assinado', 1)}${passo('ingresso pronto', 2)}</div>`;
+}
+
+/**
+ * Uma compra na lista, com a etapa dela.
+ *
+ * OS CÓDIGOS SÓ APARECEM QUANDO A COMPRA ESTÁ PRONTA. O servidor devolve, em
+ * `ingressos`, os convites nomeados da festa inteira — não os desta compra.
+ * Mostrá-los numa compra que ainda não terminou faria parecer resolvida uma
+ * coisa que não está, e é justamente isso que esta tela veio desfazer.
+ */
+function blocoDaCompraDoEvento(c) {
+  const pronta = c.etapa === 'pronto';
+  return `
+    <div class="ja-compra">
+      <div class="ja-protocolo">Protocolo ${escapar(c.protocolo)}</div>
+      ${trilhaDaCompra(c.etapa)}
+      ${pronta
+        ? (c.ingressos || []).map((i) => `
+            <div class="ja-ingresso">
+              <span>${escapar(i.convidado || 'sem nome')}</span>
+              <code>${escapar(i.codigo || '')}</code>
+            </div>`).join('')
+        : ''}
+      ${c.etapa === 'falta_assinar' && c.assinaturaUrl ? `
+        <a class="link-inline" href="${escapar(c.assinaturaUrl)}" target="_blank" rel="noopener">assinar o aditivo agora</a>`
+        : ''}
+      ${c.etapa === 'processando' ? `
+        <p class="rodape-nota">Assinado. O ingresso aparece aqui em alguns minutos.</p>` : ''}
+      ${c.etapa === 'aguardando_pagamento' ? `
+        <p class="rodape-nota">Assim que o pagamento for confirmado, seguimos para a assinatura.</p>` : ''}
+      <button type="button" class="link-inline" data-ver="${escapar(c.compraId || '')}">
+        ${pronta ? 'ver, enviar e baixar o ingresso' : 'acompanhar esta compra'}
+      </button>
+    </div>`;
+}
+
+function telaMeusIngressos() {
+  const tem = (compraEvento.jaComprados || []).length;
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(compraEvento.evento.nome)}</div>
+        <h1>${tem ? 'Seus <span class="grifo">ingressos</span>' : 'Compras <span class="grifo">encerradas</span>'}</h1>
+        <p class="sub">
+          ${tem
+            ? 'Apresente na entrada, impresso ou na tela do celular.'
+            : 'As compras para esta festa já se encerraram e você não tem ingresso comprado por aqui. Fale com a equipe da sua formatura.'}
+        </p>
+
+        ${(compraEvento.jaComprados || []).map(blocoDaCompraDoEvento).join('')}
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelectorAll('[data-ver]').forEach((b) => {
+    b.addEventListener('click', () => telaIngressoDoEvento(b.getAttribute('data-ver')));
+  });
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -7301,6 +7704,64 @@ function telaPrecoIndisponivel() {
   );
 }
 
+/**
+ * NÃO DÁ PARA COMPRAR — E O MOTIVO (22/10/2026).
+ *
+ * Quase sempre é parcela vencida (cláusula 8.1 do contrato): 29 dos 66
+ * formandos de 13/11 estão nessa situação. A outra causa é cadastro
+ * incompleto. Os dois têm solução, e nenhum dos dois é "tente de novo".
+ *
+ * O QUE ESTA TELA NÃO FAZ é fechar a porta inteira. Quem não pode comprar
+ * ainda pode ter convite do pacote, convite já comprado e nome para
+ * informar — travar isso junto puniria duas vezes pela mesma dívida.
+ */
+function telaCompraBloqueada() {
+  const temConvites = !!(compraEvento.meusConvites && compraEvento.meusConvites.convites > 0);
+  const temIngressos = (compraEvento.jaComprados || []).length > 0;
+
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(compraEvento.evento?.nome ?? 'Convite')}</div>
+        <h1>Compra <span class="grifo">em espera</span></h1>
+        <p class="sub">${escapar(compraEvento.bloqueio)}</p>
+
+        <div class="faixa alerta" style="margin-top:12px"><div>
+          Assim que estiver regularizado, a compra de convites libera sozinha nesta mesma página —
+          não precisa pedir nada à equipe.
+        </div></div>
+
+        ${temConvites ? `
+          <button class="botao" id="nomear" style="margin-top:14px">
+            ${compraEvento.meusConvites.faltam > 0 ? 'Dizer quem usa meus convites' : 'Ver e mudar os nomes'}
+          </button>` : ''}
+        ${temIngressos ? `
+          <button class="botao ${temConvites ? 'secundario' : ''}" id="ver-ingressos" style="margin-top:10px">
+            Ver meus ingressos
+          </button>` : ''}
+        ${/*
+          SEM BOTÃO DE WHATSAPP (decisão do Dani, 22/10/2026).
+
+          A tela diz o que está pendendo e sai do caminho. Quem está em
+          atraso já tem o canal da equipe — e um botão aqui transformaria o
+          aviso num convite a negociar boleto por esta porta, que não é o
+          lugar: esta página vende convite.
+        */''}
+        <p class="rodape-nota" style="margin-top:14px">
+          ${temConvites || temIngressos
+            ? 'Os convites que você já tem continuam valendo, e os nomes podem ser informados aqui.'
+            : 'A equipe da sua formatura resolve a 2ª via do boleto.'}
+        </p>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelector('#nomear')?.addEventListener('click', () => telaNomearConvites());
+  app.querySelector('#ver-ingressos')?.addEventListener('click', () => telaMeusIngressos());
+}
+
 /** Depois do login: escolher quantos convites e como pagar. */
 function telaComprarIngresso(erro) {
   const e = compraEvento.evento;
@@ -7308,7 +7769,12 @@ function telaComprarIngresso(erro) {
   // SEM PREÇO NÃO SE COMPRA (21/10/2026). `unitario` nulo quer dizer que o
   // servidor não respondeu quanto custa o convite da turma dele. Seguir com
   // zero mostraria "R$ 0,00 cada" numa tela onde a pessoa decide pagar.
-  if (compraEvento.unitario == null) return telaPrecoIndisponivel();
+  //
+  // E quando ele disse POR QUE não respondeu, é isso que a pessoa precisa
+  // ler — não "tente de novo", que não resolve um boleto vencido.
+  if (compraEvento.unitario == null) {
+    return compraEvento.bloqueio ? telaCompraBloqueada() : telaPrecoIndisponivel();
+  }
 
   const total = compraEvento.unitario * compraEvento.quantidade;
   app.className = 'entrar';
@@ -7323,19 +7789,41 @@ function telaComprarIngresso(erro) {
           ${e.local?.nome ? ` · ${escapar(e.local.nome)}` : ''}
         </p>
 
+        ${/*
+          OS CONVITES QUE ELE TEM, com os nomes que faltam (22/10/2026).
+
+          Vem do contrato, não da compra: quem teve o convite lançado na
+          adesão pela equipe não aparecia em lugar nenhum desta tela, e não
+          tinha como informar quem usa cada um.
+        */''}
+        ${compraEvento.meusConvites && compraEvento.meusConvites.convites > 0 ? `
+          <div class="ja-comprados">
+            <div class="ja-titulo">Seus convites nesta festa</div>
+            <div class="convites-conta">
+              <b>${compraEvento.meusConvites.convites}</b> convite(s)
+              ${compraEvento.meusConvites.faltam > 0
+                ? `· <span class="falta-nome">${compraEvento.meusConvites.faltam} sem nome</span>`
+                : '· todos nomeados'}
+            </div>
+            ${(compraEvento.meusConvites.nomes || []).length ? `
+              <div class="convites-nomes">
+                ${compraEvento.meusConvites.nomes.map((n) => `<div class="ja-ingresso"><span>${escapar(n.nome)}</span></div>`).join('')}
+              </div>` : ''}
+            <button type="button" class="botao secundario" id="nomear" style="margin-top:10px">
+              ${compraEvento.meusConvites.faltam > 0 ? 'Dizer quem usa cada convite' : 'Mudar os nomes'}
+            </button>
+            ${compraEvento.meusConvites.janela && compraEvento.meusConvites.janela.fechaEm ? `
+              <p class="rodape-nota" style="margin-top:8px">
+                A lista fecha em ${escapar(dataCurta(compraEvento.meusConvites.janela.fechaEm))}, quando a equipe
+                fecha o número com a portaria.
+              </p>` : ''}
+          </div>
+        ` : ''}
+
         ${(compraEvento.jaComprados || []).length ? `
           <div class="ja-comprados">
-            <div class="ja-titulo">Você já tem ingresso nesta festa</div>
-            ${compraEvento.jaComprados.map((c) => `
-              <div class="ja-compra">
-                <div class="ja-protocolo">Protocolo ${escapar(c.protocolo)}</div>
-                ${(c.ingressos || []).map((i) => `
-                  <div class="ja-ingresso">
-                    <span>${escapar(i.convidado || 'sem nome')}</span>
-                    <code>${escapar(i.codigo || '')}</code>
-                  </div>`).join('')}
-                <button type="button" class="link-inline" data-ver="${escapar(c.compraId || '')}">ver e baixar o ingresso</button>
-              </div>`).join('')}
+            <div class="ja-titulo">Ingressos comprados por aqui</div>
+            ${compraEvento.jaComprados.map(blocoDaCompraDoEvento).join('')}
           </div>
         ` : ''}
 
@@ -7388,6 +7876,7 @@ function telaComprarIngresso(erro) {
   });
 
   app.querySelector('#compartilhar')?.addEventListener('click', () => telaCompartilhar());
+  app.querySelector('#nomear')?.addEventListener('click', () => telaNomearConvites());
 
   app.querySelector('#menos').addEventListener('click', () => {
     if (compraEvento.quantidade > 1) compraEvento.quantidade--;
@@ -7404,6 +7893,123 @@ function telaComprarIngresso(erro) {
     }),
   );
   app.querySelector('#seguir').addEventListener('click', () => telaNomesDosIngressos());
+}
+
+/**
+ * QUEM USA CADA CONVITE (22/10/2026).
+ *
+ * Antes isto só existia dentro da compra pela página (os nomes vão junto) e
+ * no portal completo, que não foi liberado aos alunos. Quem teve o convite
+ * lançado na adesão pela equipe não tinha como informar os nomes de jeito
+ * nenhum — eles chegariam por WhatsApp, um a um, para alguém digitar.
+ *
+ * A lista é gravada INTEIRA, como no portal: a tela manda os campos todos, e
+ * o servidor troca a lista da festa. Um "só o que mudou" teria de adivinhar
+ * qual campo é qual convite, e o formando reordena os nomes o tempo todo.
+ *
+ * Campo em branco não vira convidado sem nome: ele simplesmente fica para
+ * depois, e a tela diz quantos faltam.
+ */
+function telaNomearConvites(erro) {
+  const f = compraEvento.meusConvites;
+  if (!f) return telaComprarIngresso();
+
+  const quantos = f.convites;
+  const atuais = (f.nomes || []).map((n) => ({ nome: n.nome ?? '', documento: n.documento ?? '' }));
+  while (atuais.length < quantos) atuais.push({ nome: '', documento: '' });
+
+  // O PRAZO NA TELA, NÃO NO FIM DO FORMULÁRIO (22/10/2026).
+  //
+  // Trocar um nome já dado sempre foi permitido até o prazo — e é normal
+  // trocar de convidado em três semanas. Mas a tela não dizia até quando, e
+  // depois da data ela ainda oferecia os campos: a pessoa digitava tudo,
+  // apertava Salvar e só então ouvia "a lista fechou". Agora o aviso vem
+  // antes, e passado o prazo o formulário não aparece — quem precisa trocar
+  // algo fala com a equipe, que pode mexer a qualquer momento.
+  const janela = f.janela || { aberta: true };
+  const fecha = janela.fechaEm ? dataCurta(janela.fechaEm) : null;
+
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(compraEvento.evento.nome)}</div>
+        <h1>Quem usa cada <span class="grifo">convite</span></h1>
+        <p class="sub">
+          ${janela.aberta
+            ? `Você tem ${quantos} convite(s) nesta festa. Escreva o nome de quem vai usar cada um — é por ele que a
+               portaria deixa entrar. Pode deixar em branco e voltar depois.`
+            : 'A lista desta festa já foi fechada com a produção.'}
+        </p>
+
+        ${!janela.aberta ? `
+          <div class="faixa alerta"><div>
+            ${escapar(janela.motivo || 'A lista já fechou.')}
+          </div></div>
+          ${(f.nomes || []).length ? `
+            <div class="ja-comprados" style="margin-top:12px">
+              <div class="ja-titulo">Os nomes que estão na portaria</div>
+              ${(f.nomes || []).map((n) => `
+                <div class="ja-ingresso">
+                  <span>${escapar(n.nome)}</span>
+                  ${n.documento ? `<code>${escapar(n.documento)}</code>` : ''}
+                </div>`).join('')}
+            </div>` : ''}
+          <button class="botao" id="voltar" style="margin-top:14px">Voltar</button>
+        ` : ''}
+
+        ${janela.aberta ? `
+        ${fecha ? `
+          <div class="faixa"><div>
+            Dá para mudar os nomes até <b>${escapar(fecha)}</b>. Depois disso a lista já foi para a portaria e
+            qualquer troca passa a ser com a equipe.
+          </div></div>` : ''}
+
+        <form id="form-nomes" novalidate>
+          ${atuais.map((n, i) => `
+            <div class="campo">
+              <label for="n${i}">Convite ${i + 1}</label>
+              <input id="n${i}" data-nome="${i}" autocomplete="off" placeholder="nome completo"
+                     value="${escapar(n.nome)}" />
+              <input id="d${i}" data-doc="${i}" autocomplete="off" placeholder="documento (opcional)"
+                     value="${escapar(n.documento)}" style="margin-top:6px" />
+            </div>`).join('')}
+          ${erro ? `<p class="erro">${escapar(erro)}</p>` : ''}
+          <button class="botao" type="submit">Salvar a lista</button>
+        </form>
+        <button class="botao secundario" id="voltar" style="margin-top:10px">Voltar</button>
+        ` : ''}
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelector('#voltar').addEventListener('click', () => telaComprarIngresso());
+
+  app.querySelector('#form-nomes')?.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const nomes = [];
+    for (let i = 0; i < quantos; i++) {
+      const nome = app.querySelector(`[data-nome="${i}"]`).value.trim();
+      if (!nome) continue;
+      nomes.push({ nome, documento: app.querySelector(`[data-doc="${i}"]`).value.trim() || null });
+    }
+
+    const botao = app.querySelector('button[type=submit]');
+    botao.disabled = true;
+    botao.textContent = 'Salvando…';
+    try {
+      const festas = await pedirComAcesso(`/${encodeURIComponent(compraEvento.token)}/meus-convites`, {
+        method: 'PUT',
+        body: JSON.stringify({ nomes }),
+      });
+      compraEvento.meusConvites = Array.isArray(festas) ? (festas[0] ?? compraEvento.meusConvites) : compraEvento.meusConvites;
+      avisar(nomes.length ? 'Lista salva' : 'Lista limpa');
+      telaComprarIngresso();
+    } catch (e) {
+      telaNomearConvites(e.message);
+    }
+  });
 }
 
 /**
@@ -7620,6 +8226,70 @@ function telaPagamentoDoEvento(compra, previa) {
 }
 
 /** O ingresso: protocolo, códigos e o PDF. */
+/** O PDF dos ingressos desta compra, como arquivo. */
+async function pdfDaCompra(compraId) {
+  const base = baseEventoPublico();
+  const r = await fetch(`${base}/${encodeURIComponent(compraEvento.token)}/compra/${encodeURIComponent(compraId)}/pdf`, {
+    headers: { authorization: `Bearer ${compraEvento.acesso}` },
+  });
+  if (!r.ok) throw new Error('falha');
+  return r.blob();
+}
+
+/**
+ * MANDAR O INGRESSO PARA QUEM VAI USAR (22/10/2026).
+ *
+ * O convite é comprado pelo formando e usado por outra pessoa. Até aqui o
+ * caminho era baixar o PDF e descobrir sozinho como repassar — num celular,
+ * achar o arquivo baixado para anexar no WhatsApp já é obstáculo.
+ *
+ * Então o envio usa o compartilhamento do próprio aparelho, com o arquivo
+ * anexado: no celular ele abre a lista de contatos do WhatsApp e manda o PDF
+ * direto. Onde isso não existe — navegador de computador, em geral —, o
+ * arquivo é baixado, que é o que dá para fazer ali.
+ *
+ * O servidor não manda por nós de propósito: o convidado não tem e-mail
+ * cadastrado (só nome, documento e telefone), e mandar por WhatsApp exigiria
+ * um modelo de mensagem aprovado pela Meta, que não existe para ingresso.
+ * Quem tem a relação com o convidado é o formando.
+ */
+async function enviarIngresso(compraId, protocolo, festa) {
+  let blob;
+  try {
+    blob = await pdfDaCompra(compraId);
+  } catch {
+    return avisar('Não foi possível gerar o PDF agora');
+  }
+
+  const nome = `ingresso-${protocolo}.pdf`;
+  const arquivo = new File([blob], nome, { type: 'application/pdf' });
+  const texto = `Seu ingresso para ${festa}. Apresente na entrada, impresso ou na tela do celular.`;
+
+  if (navigator.canShare && navigator.canShare({ files: [arquivo] })) {
+    try {
+      await navigator.share({ files: [arquivo], title: 'Ingresso', text: texto });
+      return;
+    } catch (e) {
+      // Cancelar o compartilhamento não é erro: a pessoa mudou de ideia, e
+      // baixar o arquivo por cima disso seria fazer o que ela desfez.
+      if (e && e.name === 'AbortError') return;
+    }
+  }
+
+  baixarBlob(blob, nome);
+  avisar('Ingresso baixado — anexe no WhatsApp do convidado');
+}
+
+/** Salva um arquivo que já está na mão. */
+function baixarBlob(blob, nome) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = nome;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 async function telaIngressoDoEvento(compraId) {
   app.innerHTML = `<div class="entrar-caixa">${marca()}<div class="cartao"><div class="vazio">Buscando seu ingresso…</div></div></div>`;
 
@@ -7652,7 +8322,10 @@ async function telaIngressoDoEvento(compraId) {
       <div class="cartao">
         <div class="kicker">Protocolo ${escapar(c.protocolo)}</div>
         <h1>${pago ? 'Ingresso <span class="grifo">confirmado</span>' : 'Pagamento <span class="grifo">pendente</span>'}</h1>
-        <p class="sub">${escapar(c.festa.nome)} · ${escapar(c.festa.data ? dataLonga(c.festa.data) : 'data a confirmar')}</p>
+        <p class="sub">
+          ${escapar(c.festa.nome)} · ${escapar(c.festa.data ? dataLonga(c.festa.data) : 'data a confirmar')}
+          ${c.festa.hora ? ` · ${escapar(faixaDeHorario(c.festa.hora, c.festa.horaFim))}` : ''}
+        </p>
 
         ${!pago ? `
           <div class="faixa alerta"><div>
@@ -7678,7 +8351,8 @@ async function telaIngressoDoEvento(compraId) {
           </div>`).join('')}
 
         ${temIngresso ? `
-          <button class="botao" id="baixar" style="margin-top:12px">Baixar ingresso em PDF</button>
+          <button class="botao" id="enviar" style="margin-top:12px">Enviar para o convidado</button>
+          <button class="botao secundario" id="baixar" style="margin-top:10px">Baixar em PDF</button>
           <button class="botao secundario" id="comprar-mais" style="margin-top:10px">Comprar outro convite</button>
           <button class="botao secundario" id="atualizar" style="margin-top:10px">Atualizar</button>
         ` : `
@@ -7714,25 +8388,1081 @@ async function telaIngressoDoEvento(compraId) {
     telaComprarIngresso();
   });
 
+  app.querySelector('#enviar')?.addEventListener('click', () =>
+    enviarIngresso(compraId, c.protocolo, c.festa.nome),
+  );
+
   app.querySelector('#baixar')?.addEventListener('click', async () => {
     try {
-      const base = baseEventoPublico();
-      const r = await fetch(`${base}/${encodeURIComponent(compraEvento.token)}/compra/${encodeURIComponent(compraId)}/pdf`, {
-        headers: { authorization: `Bearer ${compraEvento.acesso}` },
-      });
-      if (!r.ok) throw new Error('falha');
-      const blob = await r.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `ingresso-${c.protocolo}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      baixarBlob(await pdfDaCompra(compraId), `ingresso-${c.protocolo}.pdf`);
     } catch {
       avisar('Não foi possível gerar o PDF agora');
     }
   });
 }
+
+</script>
+<script>
+/* ───────────────────────────────────────────────────────────────────────────
+   A PORTARIA DA FESTA (22/10/2026)
+
+   A equipe de produção abre o link dela no celular, na porta, e confere quem
+   entra. Antes disto o que existia era o PDF impresso, riscado à caneta: no
+   fim da noite ninguém sabia quantos tinham entrado sem contar risco por
+   risco, e o papel de uma porta não via o da outra.
+
+   A INTERNET DO SALÃO NÃO É CONFIÁVEL (dito pelo Dani), e isso manda no
+   desenho inteiro:
+
+     · marcar é LOCAL e imediato. O check aparece na hora, sem esperar o
+       servidor — na porta, um segundo de espera com fila é um segundo de
+       fila;
+     · o que foi marcado vai para uma fila no aparelho e sobe quando dá. Se
+       o aplicativo for fechado, a fila continua lá;
+     · reenviar é o caso NORMAL, não o excepcional: o aparelho não sabe o que
+       chegou. Cada marcação leva um id gerado aqui, e o servidor usa esse id
+       para não duplicar;
+     · a lista carregada fica guardada também. Chegando sem sinal nenhum, a
+       portaria abre a última lista que viu em vez de uma tela vazia.
+
+   O que esta tela NÃO faz: vender, alterar cadastro, mostrar contrato. O link
+   da portaria abre isto e só isto.
+
+   TUDO DENTRO DE UMA FUNÇÃO (22/10/2026). Este arquivo e o app.js viram
+   scripts comuns no mesmo HTML, então dividem o escopo global — e `guardar` e
+   `recuperar`, que aqui são da portaria, já existiam lá como atalhos do
+   sessionStorage. Redeclarar derrubava o arquivo inteiro na hora de carregar:
+   a página ficava em "Carregando a festa…" para sempre, e o app.js chamava
+   uma `telaPortaria` que nunca tinha sido definida.
+
+   Lá fora só aparece `telaPortaria`, que é o que o app.js chama.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+(function () {
+const PORTARIA = {
+  /** A chave de quem está marcado, no aparelho. */
+  entradas: new Map(),
+  /** O que ainda não subiu: clienteId → {chave, entrouEm} ou {extra}. */
+  fila: new Map(),
+  lista: null,
+  token: null,
+  busca: '',
+  subindo: false,
+  /** O aviso dos convites sem nome está aberto? Nasce fechado. */
+  verSemNome: false,
+  /**
+   * Quem da equipe está com este aparelho (22/10/2026).
+   *
+   * Vai gravado em cada entrada. Com duas ou três portas, a dúvida do dia
+   * seguinte — "quem deixou essa pessoa entrar?" — não tinha resposta. Fica
+   * no aparelho, não no link: o link é da festa, a pessoa é de quem está
+   * segurando o celular.
+   */
+  operador: null,
+  /** `todos` | `falta` | `entrou`. Na porta, quase sempre `falta`. */
+  filtro: 'todos',
+  /** O laço que busca a lista de novo sozinho. */
+  relogio: null,
+};
+
+/** O nome de quem está na porta vale para qualquer festa deste aparelho. */
+const CHAVE_OPERADOR = 'portaria:operador';
+
+const chaveGuardada = (token) => `portaria:${token}`;
+
+function guardar() {
+  try {
+    localStorage.setItem(
+      chaveGuardada(PORTARIA.token),
+      JSON.stringify({
+        lista: PORTARIA.lista,
+        entradas: [...PORTARIA.entradas.entries()],
+        fila: [...PORTARIA.fila.entries()],
+        em: new Date().toISOString(),
+      }),
+    );
+  } catch {
+    // Aparelho sem espaço ou em aba anônima: a noite continua, só sem a
+    // rede de segurança. Não vale travar a porta por isso.
+  }
+}
+
+function recuperar(token) {
+  try {
+    const cru = localStorage.getItem(chaveGuardada(token));
+    if (!cru) return false;
+    const d = JSON.parse(cru);
+    PORTARIA.lista = d.lista ?? null;
+    PORTARIA.entradas = new Map(d.entradas ?? []);
+    PORTARIA.fila = new Map(d.fila ?? []);
+    return !!PORTARIA.lista;
+  } catch {
+    return false;
+  }
+}
+
+function novoId() {
+  if (crypto?.randomUUID) return crypto.randomUUID();
+  // Aparelho antigo sem randomUUID: o id só precisa ser único entre os
+  // aparelhos da mesma noite.
+  return `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}-4000-8000-${Math.random().toString(16).slice(2, 14)}`;
+}
+
+/** Sobe o que está na fila. Falhar é normal; a fila espera a próxima. */
+async function escoarFila() {
+  if (PORTARIA.subindo || !PORTARIA.fila.size || !navigator.onLine) return;
+  PORTARIA.subindo = true;
+  const base = baseEventoPublico();
+  const t = encodeURIComponent(PORTARIA.token);
+
+  try {
+    const checks = [...PORTARIA.fila.entries()].filter(([, v]) => !v.extra);
+    if (checks.length) {
+      const r = await fetch(`${base}/${t}/portaria/entradas`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          entradas: checks.map(([clienteId, v]) => ({
+            clienteId,
+            chave: v.chave,
+            entrouEm: v.entrouEm,
+            marcadoPor: v.marcadoPor ?? null,
+          })),
+        }),
+      });
+      if (r.ok) {
+        const { data } = await r.json();
+        for (const id of data?.aceitos ?? []) PORTARIA.fila.delete(id);
+        // Recusado por motivo definitivo sai da fila: insistir não resolve e
+        // a fila cresceria para sempre.
+        for (const rec of data?.recusados ?? []) PORTARIA.fila.delete(rec.clienteId);
+      }
+    }
+
+    for (const [clienteId, v] of [...PORTARIA.fila.entries()].filter(([, x]) => x.extra)) {
+      const r = await fetch(`${base}/${t}/portaria/extra`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ clienteId, ...v.extra }),
+      });
+      if (r.ok) PORTARIA.fila.delete(clienteId);
+    }
+  } catch {
+    // Sem sinal: fica para a próxima.
+  } finally {
+    PORTARIA.subindo = false;
+    guardar();
+    pintarEstado();
+  }
+}
+
+/** O aviso de quantos checks ainda não subiram. */
+function pintarEstado() {
+  const el = document.querySelector('#portaria-estado');
+  if (!el) return;
+  const n = PORTARIA.fila.size;
+  el.textContent = n ? `${n} marcação(ões) esperando internet` : 'tudo sincronizado';
+  el.className = n ? 'portaria-pendente' : 'portaria-ok';
+}
+
+async function telaPortaria(token, evento) {
+  PORTARIA.token = token;
+  app.className = 'entrar';
+
+  // QUEM ESTÁ NA PORTA, antes de qualquer coisa. É uma pergunta só, uma vez
+  // por aparelho — e sem ela as entradas da noite ficam sem autor.
+  try {
+    PORTARIA.operador = PORTARIA.operador || localStorage.getItem(CHAVE_OPERADOR) || null;
+  } catch {
+    // Aba anônima: segue sem guardar, perguntando a cada abertura.
+  }
+  if (!PORTARIA.operador) return telaQuemEstaNaPorta(token, evento);
+
+  const tinha = recuperar(token);
+  app.innerHTML = `<div class="entrar-caixa">${marca()}<div class="cartao"><div class="vazio">${
+    tinha ? 'Atualizando a lista…' : 'Carregando a lista…'
+  }</div></div></div>`;
+
+  try {
+    const nova = await pedirEventoPublico(`/${encodeURIComponent(token)}/portaria`);
+    PORTARIA.lista = nova;
+    // Quem o servidor já tem como dentro entra no mapa local: dois aparelhos
+    // na mesma porta enxergam o mesmo depois de atualizar.
+    for (const p of nova.pessoas ?? []) if (p.entrouEm) PORTARIA.entradas.set(p.chave, p.entrouEm);
+    guardar();
+  } catch (e) {
+    if (!PORTARIA.lista) {
+      app.innerHTML = `<div class="entrar-caixa">${marca()}<div class="cartao">
+        <h1>Não <span class="grifo">carregou</span></h1>
+        <p class="sub">${escapar(e.message)}</p>
+        <button class="botao" id="tentar">Tentar de novo</button>
+      </div>${notaRodape()}</div>`;
+      app.querySelector('#tentar').addEventListener('click', () => telaPortaria(token, evento));
+      return;
+    }
+    // Sem sinal, mas com a lista de antes: a porta abre assim mesmo.
+  }
+
+  escoarFila();
+  desenharPortaria();
+  ligarRelogio(token, evento);
+}
+
+/**
+ * QUEM ESTÁ NA PORTA (22/10/2026).
+ *
+ * Uma pergunta, uma vez por aparelho. Não é login — na porta não há login, e
+ * o que prova que a pessoa é da equipe é ter o endereço do link. É para a
+ * entrada ter autor: com três pessoas conferindo, "quem marcou esta?" não
+ * tinha resposta no dia seguinte.
+ */
+function telaQuemEstaNaPorta(token, evento) {
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">Portaria</div>
+        <h1>Quem está na <span class="grifo">porta</span>?</h1>
+        <p class="sub">
+          Seu nome fica gravado em cada entrada que você marcar. Perguntamos uma vez só neste aparelho.
+        </p>
+        <form id="form-quem" novalidate>
+          <div class="campo">
+            <label for="quem">Seu nome</label>
+            <input id="quem" autocomplete="name" placeholder="Camyla" value="${escapar(PORTARIA.operador ?? '')}" />
+          </div>
+          <p class="erro" id="erro" hidden></p>
+          <button class="botao" type="submit">Abrir a lista</button>
+        </form>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  const campo = app.querySelector('#quem');
+  campo.focus();
+  app.querySelector('#form-quem').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const nome = campo.value.trim();
+    if (nome.length < 2) {
+      const erro = app.querySelector('#erro');
+      erro.hidden = false;
+      erro.textContent = 'Escreva seu nome para a lista ter autor.';
+      return;
+    }
+    PORTARIA.operador = nome.slice(0, 80);
+    try { localStorage.setItem(CHAVE_OPERADOR, PORTARIA.operador); } catch { /* segue sem guardar */ }
+    telaPortaria(token, evento);
+  });
+}
+
+/**
+ * A LISTA SE ATUALIZA SOZINHA (22/10/2026).
+ *
+ * Duas portas com dois celulares só se enxergavam quando alguém recarregava.
+ * O banco já recusa a entrada duplicada da mesma pessoa, mas a equipe não
+ * via isso na tela — e marcava de novo quem já tinha entrado pela outra
+ * porta, achando que a primeira marcação não havia pegado.
+ *
+ * MEIO MINUTO é o intervalo: a fila da porta anda nesse ritmo, e mais
+ * frequente só gastaria a bateria de um aparelho que vai passar a noite
+ * ligado.
+ *
+ * NÃO REDESENHA NO MEIO DE UM TOQUE. Se alguém está digitando na busca ou
+ * numa outra tela (fora da lista, relatório), o estado é atualizado e o
+ * desenho espera — redesenhar por baixo da mão perderia o que foi digitado.
+ */
+function ligarRelogio(token, evento) {
+  if (PORTARIA.relogio) clearInterval(PORTARIA.relogio);
+  PORTARIA.relogio = setInterval(async () => {
+    if (!navigator.onLine) return;
+    try {
+      const nova = await pedirEventoPublico(`/${encodeURIComponent(token)}/portaria`);
+      PORTARIA.lista = nova;
+      for (const p of nova.pessoas ?? []) if (p.entrouEm) PORTARIA.entradas.set(p.chave, p.entrouEm);
+      guardar();
+      const digitando = document.activeElement && document.activeElement.id === 'busca';
+      if (app.className === 'portaria' && !digitando) desenharPortaria();
+    } catch {
+      // Sem sinal: a lista de antes continua servindo.
+    }
+  }, 30000);
+}
+
+/**
+ * Em que grupo esta pessoa entra.
+ *
+ * Por TURMA, pedido do Dani: são quatro turmas na mesma porta em 13/11, e a
+ * produção fecha o número com cada uma. Os avulsos — convite vendido fora do
+ * CRM a quem não é formando — não são de turma nenhuma e ganham o próprio
+ * grupo, no fim.
+ */
+function grupoDe(p) {
+  if (p.tipo === 'avulso') return 'Convites avulsos';
+  return p.turma || 'Sem turma';
+}
+
+/**
+ * A lista separada por turma, em ordem alfabética dentro de cada uma.
+ *
+ * A ordem de dentro vem do servidor e é preservada aqui, porque agrupar não
+ * reordena: por nome, com os convites sem nome no fim do bloco de quem os
+ * convidou — na porta se procura pelo nome de quem está na frente, e quem
+ * não tem nome é achado pelo nome do formando.
+ */
+function emGrupos(pessoas) {
+  const mapa = new Map();
+  for (const p of pessoas) {
+    const g = grupoDe(p);
+    if (!mapa.has(g)) mapa.set(g, []);
+    mapa.get(g).push(p);
+  }
+  return [...mapa.entries()].sort((a, b) => {
+    // Os de fora da turma por último: a lista é das turmas.
+    const forA = a[0] === 'Convites avulsos' || a[0] === 'Sem turma';
+    const forB = b[0] === 'Convites avulsos' || b[0] === 'Sem turma';
+    if (forA !== forB) return forA ? 1 : -1;
+    return a[0].localeCompare(b[0], 'pt-BR');
+  });
+}
+
+/**
+ * O documento com pontuação: `09991985999` vira `099.919.859-99`.
+ *
+ * Nem todo cadastro tem a máscara, e na porta se compara o papel com a
+ * carteira de identidade, onde o número vem pontuado. Ler onze dígitos
+ * corridos atrasa a conferência de quem está com a fila na frente.
+ */
+function documentoBR(v) {
+  const d = String(v ?? '').replace(/\D/g, '');
+  if (d.length === 11) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+  return String(v ?? '');
+}
+
+/** A hora que a equipe lê é a de Brasília, não a do aparelho em UTC. */
+function horaDaEntrada(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleTimeString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}
+
+function desenharPortaria() {
+  const l = PORTARIA.lista;
+  const termo = PORTARIA.busca.trim().toLowerCase();
+  const todas = l.pessoas ?? [];
+
+  const achadas = termo
+    ? todas.filter(
+        (p) =>
+          (p.nome ?? '').toLowerCase().includes(termo) ||
+          (p.de ?? '').toLowerCase().includes(termo) ||
+          (p.documento ?? '').includes(termo) ||
+          (p.codigo ?? '').toLowerCase().includes(termo),
+      )
+    : todas;
+
+  const dentroDe = (p) => PORTARIA.entradas.has(p.chave);
+  const dentro = todas.filter(dentroDe).length;
+  const falta = todas.length - dentro;
+
+  // O FILTRO É O QUE ACELERA A PORTA (22/10/2026). Com 101 nomes e fila na
+  // frente, rolar a lista inteira para achar quem ainda não chegou é o gasto
+  // de tempo que esta tela veio cortar.
+  const pessoas =
+    PORTARIA.filtro === 'falta' ? achadas.filter((p) => !dentroDe(p))
+    : PORTARIA.filtro === 'entrou' ? achadas.filter(dentroDe)
+    : achadas;
+
+  const semNomeTotal = (l.semNome ?? []).reduce((soma, sn) => soma + sn.quantos, 0);
+  const extras = (l.extras ?? []).length + [...PORTARIA.fila.values()].filter((v) => v.extra).length;
+  const grupos = emGrupos(pessoas);
+
+  app.className = 'portaria';
+  app.innerHTML = `
+    <div class="portaria-topo">
+      <div>
+        <div class="portaria-festa">${escapar(l.evento.nome)}</div>
+        <div class="portaria-sub">
+          ${escapar(l.evento.data ? dataLonga(l.evento.data) : '')}
+          ${l.evento.hora ? ` · ${escapar(faixaDeHorario(l.evento.hora, l.evento.horaFim))}` : ''}
+          ${l.evento.local ? ` · ${escapar(l.evento.local)}` : ''}
+        </div>
+        <button type="button" class="portaria-eu" id="trocar-operador">
+          na porta: <b>${escapar(PORTARIA.operador ?? '')}</b>
+        </button>
+      </div>
+      <div class="portaria-placar">
+        <b>${dentro + extras}</b>
+        <span class="placar-de">de ${todas.length}</span>
+        <span id="portaria-estado" class="portaria-ok">tudo sincronizado</span>
+      </div>
+    </div>
+
+    <div class="portaria-busca">
+      <input id="busca" inputmode="search" placeholder="Procurar por nome, documento ou ingresso"
+             value="${escapar(PORTARIA.busca)}" autocomplete="off" />
+    </div>
+
+    ${/*
+      OS TRÊS FILTROS, com a contagem dentro (22/10/2026). Eles são também o
+      placar: "faltam 34" vale mais na porta do que um total que não muda.
+    */''}
+    <div class="portaria-filtros">
+      <button type="button" class="filtro-chip ${PORTARIA.filtro === 'todos' ? 'ativo' : ''}" data-filtro="todos">
+        todos <b>${todas.length}</b>
+      </button>
+      <button type="button" class="filtro-chip ${PORTARIA.filtro === 'falta' ? 'ativo' : ''}" data-filtro="falta">
+        falta chegar <b>${falta}</b>
+      </button>
+      <button type="button" class="filtro-chip ${PORTARIA.filtro === 'entrou' ? 'ativo' : ''}" data-filtro="entrou">
+        já entraram <b>${dentro}</b>
+      </button>
+    </div>
+
+    <div class="portaria-acoes">
+      <button type="button" class="botao secundario" id="fora-da-lista">Não está na lista</button>
+      <button type="button" class="botao secundario" id="imprimir">Imprimir a lista</button>
+      <button type="button" class="botao secundario" id="relatorio">Fechar a noite</button>
+    </div>
+
+    ${(l.semNome ?? []).length ? `
+      <div class="portaria-aviso">
+        <button type="button" class="aviso-cabeca" id="abrir-sem-nome" aria-expanded="${PORTARIA.verSemNome}">
+          <span>
+            <b>${semNomeTotal} convite(s) sem nome</b>, de ${(l.semNome ?? []).length} formando(s).
+            Quem chegar dizendo ser convidado de um deles aparece na lista como "convidado de".
+          </span>
+          <span class="aviso-seta">${PORTARIA.verSemNome ? 'ocultar' : 'ver quais'}</span>
+        </button>
+        ${PORTARIA.verSemNome ? `
+          <div class="aviso-nomes">
+            ${(l.semNome ?? []).map((sn) => `
+              <div class="aviso-nome">
+                <span>${escapar(sn.formando)}</span>
+                <small>${escapar(sn.turma ?? '')}</small>
+                <b>${sn.quantos}</b>
+              </div>`).join('')}
+          </div>` : ''}
+      </div>` : ''}
+
+    <div class="portaria-lista">
+      ${grupos.length ? grupos.map(([turma, gente]) => `
+        <div class="portaria-turma">
+          <span>${escapar(turma)}</span>
+          <small>${gente.filter(dentroDe).length} de ${gente.length}</small>
+        </div>
+        ${gente.map((p) => {
+          const dentroAgora = dentroDe(p);
+          const quando = horaDaEntrada(PORTARIA.entradas.get(p.chave));
+          return `
+          <button type="button" class="portaria-pessoa ${dentroAgora ? 'dentro' : ''}" data-chave="${escapar(p.chave)}">
+            <span class="marca-check">${dentroAgora ? '✓' : ''}</span>
+            <span class="quem">
+              ${/*
+                O CONVITE SEM NOME tem linha, mas não tem nome para mostrar —
+                ninguém o informou. Inventar "convidado 1" encheria a lista de
+                dado falso; o que identifica na porta é de quem ele é.
+              */''}
+              ${p.tipo === 'semnome'
+                ? `<b class="sem-nome">Convidado de ${escapar(p.de ?? '')}</b>`
+                : `<b>${escapar(p.nome)}</b>`}
+              <small>
+                ${p.tipo === 'formando' ? 'formando'
+                  : p.tipo === 'avulso' ? `convite avulso${p.turma ? ` · ${escapar(p.turma)}` : ''}`
+                  : p.tipo === 'semnome' ? 'convite sem nome'
+                  : `convidado de ${escapar(p.de ?? '')}`}
+                ${p.documento ? ` · ${escapar(p.documento)}` : ''}
+                ${p.codigo ? ` · ${escapar(p.codigo)}` : ''}
+              </small>
+            </span>
+            ${dentroAgora ? `
+              <span class="hora">
+                ${escapar(quando || 'entrou')}
+                ${p.marcadoPor ? `<small>${escapar(p.marcadoPor)}</small>` : ''}
+              </span>` : ''}
+          </button>`;
+        }).join('')}
+      `).join('') : `<p class="portaria-vazio">${
+        termo ? 'Ninguém com esse nome na lista.'
+        : PORTARIA.filtro === 'falta' ? 'Todo mundo da lista já entrou.'
+        : PORTARIA.filtro === 'entrou' ? 'Ninguém entrou ainda.'
+        : 'Ninguém nesta festa ainda.'
+      }</p>`}
+    </div>
+
+    ${(l.extras ?? []).length ? `
+      <div class="portaria-extras">
+        <div class="portaria-extras-titulo">Entraram sem estar na lista</div>
+        ${(l.extras ?? []).map((e) => `
+          <div class="portaria-extra">
+            <b>${escapar(e.nome)}</b>
+            ${e.documento ? `<small>${escapar(e.documento)}</small>` : ''}
+            ${e.observacao ? `<small>${escapar(e.observacao)}</small>` : ''}
+            <small>${escapar(horaDaEntrada(e.entrouEm))}${e.marcadoPor ? ` · ${escapar(e.marcadoPor)}` : ''}</small>
+          </div>`).join('')}
+      </div>` : ''}`;
+
+  pintarEstado();
+
+  const busca = app.querySelector('#busca');
+  busca.addEventListener('input', () => {
+    PORTARIA.busca = busca.value;
+    const pos = busca.selectionStart;
+    desenharPortaria();
+    const novo = app.querySelector('#busca');
+    novo.focus();
+    novo.setSelectionRange(pos, pos);
+  });
+
+  app.querySelectorAll('[data-chave]').forEach((b) => {
+    b.addEventListener('click', () => marcar(b.getAttribute('data-chave')));
+  });
+
+  app.querySelectorAll('[data-filtro]').forEach((b) => {
+    b.addEventListener('click', () => {
+      PORTARIA.filtro = b.getAttribute('data-filtro');
+      desenharPortaria();
+    });
+  });
+
+  app.querySelector('#fora-da-lista').addEventListener('click', () => telaForaDaLista());
+  app.querySelector('#imprimir').addEventListener('click', () => imprimirALista());
+  app.querySelector('#relatorio').addEventListener('click', () => telaRelatorio());
+
+  // Trocar quem está na porta acontece: a equipe se rende em turnos.
+  app.querySelector('#trocar-operador').addEventListener('click', () => {
+    PORTARIA.operador = null;
+    try { localStorage.removeItem(CHAVE_OPERADOR); } catch { /* segue */ }
+    telaQuemEstaNaPorta(PORTARIA.token, null);
+  });
+
+  // O aviso nasce fechado: é informação de apoio, e aberta ela empurrava a
+  // lista — que é o que a pessoa veio ver — para baixo da dobra.
+  app.querySelector('#abrir-sem-nome')?.addEventListener('click', () => {
+    PORTARIA.verSemNome = !PORTARIA.verSemNome;
+    desenharPortaria();
+  });
+}
+
+/**
+ * Marca ou desmarca alguém.
+ *
+ * Local e imediato: o check aparece antes de o servidor saber. Desmarcar vai
+ * direto ao servidor quando há sinal — é o caso raro e, sem sinal, a
+ * marcação sai da fila antes de subir, que dá no mesmo.
+ */
+async function marcar(chave) {
+  const dentro = PORTARIA.entradas.has(chave);
+
+  if (dentro) {
+    PORTARIA.entradas.delete(chave);
+    for (const [id, v] of PORTARIA.fila) if (v.chave === chave) PORTARIA.fila.delete(id);
+    guardar();
+    desenharPortaria();
+    try {
+      const base = baseEventoPublico();
+      await fetch(`${base}/${encodeURIComponent(PORTARIA.token)}/portaria/entradas/${encodeURIComponent(chave)}`, {
+        method: 'DELETE',
+      });
+    } catch {
+      // Sem sinal: a próxima atualização da lista traz a verdade do servidor.
+    }
+    return;
+  }
+
+  PORTARIA.entradas.set(chave, new Date().toISOString());
+  PORTARIA.fila.set(novoId(), {
+    chave,
+    entrouEm: new Date().toISOString(),
+    marcadoPor: PORTARIA.operador,
+  });
+  guardar();
+  desenharPortaria();
+  escoarFila();
+}
+
+/** Quem chegou sem estar na lista. */
+function telaForaDaLista() {
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(PORTARIA.lista.evento.nome)}</div>
+        <h1>Não está na <span class="grifo">lista</span></h1>
+        <p class="sub">
+          Registre quem entrou assim mesmo. No dia seguinte alguém vai perguntar quantas pessoas entraram, e a
+          resposta precisa incluir estas.
+        </p>
+        <form id="form-extra" novalidate>
+          <div class="campo"><label for="n">Nome</label><input id="n" autocomplete="off" /></div>
+          <div class="campo"><label for="d">Documento (opcional)</label><input id="d" autocomplete="off" /></div>
+          <div class="campo"><label for="o">Por que entrou (opcional)</label><input id="o" autocomplete="off" placeholder="quem autorizou, de quem é convidado…" /></div>
+          <p class="erro" id="erro" hidden></p>
+          <button class="botao" type="submit">Registrar entrada</button>
+        </form>
+        <button class="botao secundario" id="voltar" style="margin-top:10px">Voltar para a lista</button>
+      </div>
+    </div>`;
+
+  app.querySelector('#voltar').addEventListener('click', () => desenharPortaria());
+  app.querySelector('#form-extra').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const nome = app.querySelector('#n').value.trim();
+    if (nome.length < 3) {
+      const erro = app.querySelector('#erro');
+      erro.hidden = false;
+      erro.textContent = 'Escreva o nome de quem entrou.';
+      return;
+    }
+    const extra = {
+      nome,
+      documento: app.querySelector('#d').value.trim() || null,
+      observacao: app.querySelector('#o').value.trim() || null,
+      entrouEm: new Date().toISOString(),
+      marcadoPor: PORTARIA.operador,
+    };
+    PORTARIA.fila.set(novoId(), { extra });
+    // Entra na lista da tela na hora, antes de subir: quem registrou precisa
+    // ver que registrou.
+    PORTARIA.lista.extras = [...(PORTARIA.lista.extras ?? []), { id: novoId(), ...extra, entrouEm: extra.entrouEm }];
+    guardar();
+    desenharPortaria();
+    escoarFila();
+  });
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   A LISTA IMPRESSA, DE RESERVA (22/10/2026)
+
+   Se a internet do salão cair de vez, ou o aparelho reiniciar, a fila não
+   espera. Então a portaria sai de casa com a lista no papel — gerada do
+   mesmo dado da tela, na véspera, com um quadradinho para riscar à caneta.
+
+   NÃO É O RELATÓRIO. Esta folha é o plano B da conferência; o fechamento da
+   noite é outra coisa e vem do servidor.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * A FOLHA, no padrão das que a casa já imprime (22/10/2026).
+ *
+ * A primeira versão destas folhas era uma lista corrida com fonte de tela.
+ * Isto segue o desenho do PDF que o CRM gera para a portaria desde 15/10 —
+ * que é papel de trabalho, não documento de contrato: alguém vai segurar
+ * numa prancheta, na porta, com pouca luz e gente esperando.
+ *
+ * O QUE O PADRÃO MANDA:
+ *
+ *   · A4 com margem de verdade, para a folha caber na prancheta;
+ *   · cabeçalho de tabela que se REPETE em toda página — a folha 3 circula
+ *     sozinha, e sem o cabeçalho ninguém sabe o que é cada coluna;
+ *   · linha que não se parte no fim da página;
+ *   · fonte grande o bastante para ler em pé;
+ *   · a contagem no alto, porque é a primeira pergunta de quem recebe a
+ *     folha ("quanta gente é?").
+ *
+ * Fundo e cor saem na impressão (`print-color-adjust: exact`), mas nada
+ * depende deles: cada barra do gráfico traz o número ao lado, e as faixas de
+ * turma têm borda além do cinza. Impressora preto e branco imprime tudo.
+ */
+function folhaDeImpressao(titulo, corpo) {
+  return `<!doctype html>
+    <html lang="pt-BR"><head><meta charset="utf-8" />
+    <title>${titulo}</title>
+    <style>
+      @page { size: A4; margin: 14mm 10mm 16mm; }
+      * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 11.5pt; margin: 0; }
+
+      /* O cabeçalho da tabela se repete; a linha não se parte. */
+      thead { display: table-header-group; }
+      tr { page-break-inside: avoid; }
+
+      h1 { font-size: 15pt; margin: 0 0 1mm; line-height: 1.2; }
+      .sub { font-size: 10.5pt; color: #333; margin: 0 0 3mm; }
+
+      /* A contagem: primeira pergunta de quem recebe a folha. */
+      .contagem {
+        display: flex; flex-wrap: wrap; gap: 6mm;
+        border-top: 1px solid #999; border-bottom: 1px solid #999;
+        padding: 2mm 0; margin-bottom: 4mm; font-size: 9.5pt; color: #333;
+      }
+      .contagem div { white-space: nowrap; }
+      .contagem b { display: block; font-size: 15pt; color: #111; line-height: 1.1; }
+      .gerada { font-size: 8.5pt; color: #777; margin: 0 0 4mm; }
+
+      /* A faixa da turma, com borda para sobreviver ao preto e branco. */
+      .turma {
+        margin: 6mm 0 1.5mm; padding: 1mm 2mm; background: #f0f0f0;
+        border-left: 3px solid #111; font-size: 10pt; font-weight: bold;
+        display: flex; justify-content: space-between; page-break-after: avoid;
+      }
+      .turma span.qtd { font-weight: normal; color: #444; }
+
+      table { width: 100%; border-collapse: collapse; margin-bottom: 2mm; }
+      th {
+        text-align: left; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .04em;
+        border-bottom: 1.5px solid #111; padding: 1.5mm 2mm; color: #333;
+      }
+      td { padding: 2mm; border-bottom: 1px solid #ddd; vertical-align: top; font-size: 10.5pt; }
+
+      /* A coluna do risco: é o que a portaria faz quando o celular não ajuda. */
+      .risco { width: 7mm; }
+      thead .risco::after { content: '✓'; font-size: 8.5pt; }
+      tbody .risco { border: 1px solid #111; height: 5mm; padding: 0; }
+
+      .num { width: 8mm; color: #777; font-size: 9pt; }
+      .nome { font-weight: bold; }
+      .nome i { font-weight: normal; font-style: normal; font-size: 9pt; color: #666; }
+      .pendente { color: #888; font-style: italic; font-weight: normal; }
+      .doc { width: 24mm; font-size: 10pt; white-space: nowrap; }
+      .cod { width: 22mm; font-family: ui-monospace, Consolas, monospace; font-size: 9pt; color: #555; }
+      .de { width: 48mm; font-size: 9.5pt; color: #333; }
+      .hora { width: 16mm; font-size: 10pt; white-space: nowrap; }
+      .por { width: 26mm; font-size: 9.5pt; color: #333; }
+      .meio { text-align: center; }
+
+      /* O gráfico de chegada: a barra é enfeite, o número é o dado. */
+      .barra { display: flex; align-items: center; gap: 2mm; }
+      .barra .trilho { width: 44mm; height: 3mm; background: #e4e4e4; border: 1px solid #bbb; }
+      .barra .trilho i { display: block; height: 100%; background: #555; }
+
+      .assinatura {
+        margin-top: 8mm; padding-top: 3mm; border-top: 1px solid #999;
+        display: flex; gap: 10mm; font-size: 9.5pt; color: #444;
+      }
+      .assinatura div { flex: 1; }
+      .assinatura u { display: block; margin-top: 6mm; border-top: 1px solid #111; text-decoration: none; }
+
+      .secao { font-size: 12pt; font-weight: bold; margin: 7mm 0 1.5mm; page-break-after: avoid; }
+      .nova-pagina { page-break-before: always; }
+
+      @media print { .nao-imprime { display: none; } }
+    </style></head>
+    <body>${corpo}
+      <p class="nao-imprime" style="margin-top:8mm">
+        <button onclick="window.print()" style="padding:8px 16px; font-size:14px">Imprimir</button>
+      </p>
+    </body></html>`;
+}
+
+/** Abre a folha numa aba nova. Bloqueador de pop-up é o único jeito de falhar. */
+function abrirParaImprimir(html) {
+  const aba = window.open('', '_blank');
+  if (!aba) return avisar('Libere a janela para imprimir');
+  aba.document.write(html);
+  aba.document.close();
+}
+
+/** O cabeçalho que as duas folhas dividem: festa, quando, onde. */
+function cabecaDaFolha(evento, titulo) {
+  return `
+    <h1>${escapar(evento.nome)}${titulo ? ` — ${escapar(titulo)}` : ''}</h1>
+    <div class="sub">
+      ${escapar(evento.data ? dataLonga(evento.data) : 'data a definir')}
+      ${evento.hora ? ` · ${escapar(faixaDeHorario(evento.hora, evento.horaFim))}` : ''}
+      ${evento.local ? ` · ${escapar(evento.local)}` : ''}
+    </div>`;
+}
+
+/** `22/10/2026, 18:40` — quando a folha saiu, para não conferir por uma velha. */
+function agoraBR() {
+  try {
+    return new Date().toLocaleString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   A LISTA IMPRESSA, DE RESERVA (22/10/2026)
+
+   Se a internet do salão cair de vez, ou o aparelho reiniciar, a fila não
+   espera. Então a portaria sai de casa com a lista no papel — gerada do
+   mesmo dado da tela, com um quadradinho para riscar à caneta.
+
+   NÃO É O RELATÓRIO. Esta folha é o plano B da conferência; o fechamento da
+   noite é outra coisa e vem do servidor.
+   ────────────────────────────────────────────────────────────────────────── */
+
+function imprimirALista() {
+  const l = PORTARIA.lista;
+  const todas = l.pessoas ?? [];
+  const grupos = emGrupos(todas);
+  const conta = (tipo) => todas.filter((x) => x.tipo === tipo).length;
+
+  const corpo = `
+    ${cabecaDaFolha(l.evento, 'lista da portaria')}
+
+    <div class="contagem">
+      <div><b>${todas.length}</b> na lista</div>
+      <div><b>${conta('formando')}</b> formandos</div>
+      <div><b>${conta('convite')}</b> convidados</div>
+      <div><b>${conta('semnome')}</b> sem nome</div>
+      ${conta('avulso') ? `<div><b>${conta('avulso')}</b> avulsos</div>` : ''}
+    </div>
+    <p class="gerada">Folha gerada em ${escapar(agoraBR())} · nomes em ordem alfabética dentro de cada turma</p>
+
+    ${grupos.map(([turma, gente]) => `
+      <div class="turma">
+        <span>${escapar(turma)}</span>
+        <span class="qtd">${gente.length} pessoa(s)</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th class="risco"></th>
+            <th class="num">#</th>
+            <th>Nome</th>
+            <th class="doc">Documento</th>
+            <th class="cod">Ingresso</th>
+            <th class="de">De quem é</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${gente.map((pes, i) => `
+            <tr>
+              <td class="risco"></td>
+              <td class="num">${i + 1}</td>
+              ${/*
+                UMA LINHA POR PESSOA (22/10/2026).
+
+                A primeira versão escrevia "formando" embaixo de cada nome —
+                e como dois terços da lista são formandos, isso dobrava a
+                altura de quase toda linha e o número de folhas na
+                prancheta. A informação já está na coluna ao lado: "de quem
+                é" vazio quer dizer que a pessoa é da turma.
+
+                O rótulo fica só onde ele acrescenta: o convite avulso, que
+                não é formando nem convidado de ninguém.
+              */''}
+              <td class="nome">
+                ${pes.tipo === 'semnome'
+                  ? '<span class="pendente">— sem nome —</span>'
+                  : escapar(pes.nome)}
+                ${pes.tipo === 'avulso' ? ' <i>convite avulso</i>' : ''}
+              </td>
+              <td class="doc">${escapar(documentoBR(pes.documento))}</td>
+              <td class="cod">${escapar(pes.codigo ?? '')}</td>
+              <td class="de">${escapar(pes.de ?? '')}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    `).join('')}
+
+    <div class="assinatura">
+      <div>Conferido por<u></u></div>
+      <div>Porta<u></u></div>
+      <div>Total que entrou<u></u></div>
+    </div>`;
+
+  abrirParaImprimir(folhaDeImpressao('Lista da portaria', corpo));
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   O FECHAMENTO DA NOITE (22/10/2026)
+
+   No dia seguinte alguém pergunta quantas pessoas entraram, quem não veio e
+   se houve gente fora da lista. Vem do servidor, somado da mesma lista — dois
+   jeitos de contar dariam dois números, e aí ninguém sabe qual acreditar.
+
+   Dá para abrir no meio da festa: aí é o parcial, que é o que a produção
+   quer saber às 23h.
+   ────────────────────────────────────────────────────────────────────────── */
+
+async function telaRelatorio() {
+  app.className = 'entrar';
+  app.innerHTML = `<div class="entrar-caixa">${marca()}<div class="cartao"><div class="vazio">Somando a noite…</div></div></div>`;
+
+  let r;
+  try {
+    r = await pedirEventoPublico(`/${encodeURIComponent(PORTARIA.token)}/portaria/relatorio`);
+  } catch (e) {
+    app.innerHTML = `<div class="entrar-caixa">${marca()}<div class="cartao">
+      <h1>Não <span class="grifo">carregou</span></h1>
+      <p class="sub">${escapar(e.message)} O fechamento precisa de internet — a conferência na porta, não.</p>
+      <button class="botao" id="voltar">Voltar para a lista</button>
+    </div></div>`;
+    app.querySelector('#voltar').addEventListener('click', () => desenharPortaria());
+    return;
+  }
+
+  const maior = Math.max(1, ...r.pico.map((f) => f.quantos));
+
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(r.evento.nome)}</div>
+        <h1>A <span class="grifo">noite</span></h1>
+        <p class="sub">
+          ${escapar(r.evento.data ? dataLonga(r.evento.data) : '')} ·
+          fechado às ${escapar(horaDaEntrada(r.geradoEm))}
+        </p>
+
+        <div class="rel-numeros">
+          <div><b>${r.totais.entraram}</b><span>entraram</span></div>
+          <div><b>${r.totais.naoVieram}</b><span>não vieram</span></div>
+          <div><b>${r.totais.extras}</b><span>fora da lista</span></div>
+          <div><b>${r.totais.porcentagem}%</b><span>da lista</span></div>
+        </div>
+
+        <div class="secao-titulo">Por turma</div>
+        ${r.porTurma.map((x) => `
+          <div class="ja-ingresso">
+            <span>${escapar(x.turma)}</span>
+            <code>${x.entraram} de ${x.previstos}</code>
+          </div>`).join('')}
+
+        ${r.pico.length ? `
+          <div class="secao-titulo">Quando chegaram</div>
+          <div class="rel-pico">
+            ${r.pico.map((f) => `
+              <div class="pico-barra">
+                <span class="pico-hora">${escapar(f.faixa)}</span>
+                <span class="pico-trilho"><i style="width:${Math.round((f.quantos / maior) * 100)}%"></i></span>
+                <b>${f.quantos}</b>
+              </div>`).join('')}
+          </div>` : ''}
+
+        <button class="botao" id="imprimir-rel" style="margin-top:14px">Imprimir o fechamento</button>
+        <button class="botao secundario" id="voltar" style="margin-top:10px">Voltar para a lista</button>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelector('#voltar').addEventListener('click', () => desenharPortaria());
+  app.querySelector('#imprimir-rel').addEventListener('click', () => imprimirRelatorio(r));
+}
+
+function imprimirRelatorio(r) {
+  const maior = Math.max(1, ...r.pico.map((f) => f.quantos));
+
+  /** Uma tabela de gente, com ou sem as colunas da entrada. */
+  const tabela = (lista, comHora) => `
+    <table>
+      <thead>
+        <tr>
+          <th class="num">#</th>
+          <th>Nome</th>
+          <th class="de">Turma</th>
+          <th class="de">O que é</th>
+          ${comHora ? '<th class="hora">Entrou</th><th class="por">Marcado por</th>' : ''}
+        </tr>
+      </thead>
+      <tbody>
+        ${lista.map((x, i) => `
+          <tr>
+            <td class="num">${i + 1}</td>
+            <td class="nome">${escapar(x.nome)}</td>
+            <td class="de">${escapar(x.turma ?? '')}</td>
+            <td class="de">${escapar(
+              x.tipo === 'semnome' ? 'convite sem nome'
+              : x.tipo === 'convite' ? `convidado de ${x.de ?? ''}`
+              : x.tipo === 'avulso' ? 'convite avulso'
+              : 'formando',
+            )}</td>
+            ${comHora ? `<td class="hora">${escapar(x.hora ?? '')}</td><td class="por">${escapar(x.marcadoPor ?? '—')}</td>` : ''}
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  const corpo = `
+    ${cabecaDaFolha(r.evento, 'fechamento da noite')}
+
+    <div class="contagem">
+      <div><b>${r.totais.entraram}</b> entraram</div>
+      <div><b>${r.totais.naoVieram}</b> não vieram</div>
+      <div><b>${r.totais.extras}</b> fora da lista</div>
+      <div><b>${r.totais.porcentagem}%</b> da lista</div>
+      <div><b>${r.totais.previstos}</b> previstos</div>
+    </div>
+    <p class="gerada">Fechamento gerado em ${escapar(agoraBR())}</p>
+
+    <div class="secao">Por turma</div>
+    <table>
+      <thead>
+        <tr><th>Turma</th><th class="meio">Entraram</th><th class="meio">Previstos</th><th class="meio">Faltaram</th></tr>
+      </thead>
+      <tbody>
+        ${r.porTurma.map((x) => `
+          <tr>
+            <td class="nome">${escapar(x.turma)}</td>
+            <td class="meio">${x.entraram}</td>
+            <td class="meio">${x.previstos}</td>
+            <td class="meio">${x.previstos - x.entraram}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+
+    ${r.pico.length ? `
+      <div class="secao">Quando chegaram</div>
+      <table>
+        <thead><tr><th class="hora">Faixa</th><th>Entradas</th></tr></thead>
+        <tbody>
+          ${r.pico.map((f) => `
+            <tr>
+              <td class="hora">${escapar(f.faixa)}</td>
+              <td>
+                <span class="barra">
+                  <span class="trilho"><i style="width:${Math.round((f.quantos / maior) * 100)}%"></i></span>
+                  <b>${f.quantos}</b>
+                </span>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>` : ''}
+
+    ${r.extras.length ? `
+      <div class="secao">Entraram sem estar na lista (${r.extras.length})</div>
+      <table>
+        <thead>
+          <tr><th class="num">#</th><th>Nome</th><th class="doc">Documento</th><th>Por que entrou</th><th class="hora">Entrou</th></tr>
+        </thead>
+        <tbody>
+          ${r.extras.map((e, i) => `
+            <tr>
+              <td class="num">${i + 1}</td>
+              <td class="nome">${escapar(e.nome)}</td>
+              <td class="doc">${escapar(documentoBR(e.documento))}</td>
+              <td class="de">${escapar(e.observacao ?? '')}</td>
+              <td class="hora">${escapar(horaDaEntrada(e.entrouEm))}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>` : ''}
+
+    <div class="secao">Entraram (${r.entraram.length})</div>
+    ${r.entraram.length ? tabela(r.entraram, true) : '<p class="gerada">Ninguém entrou ainda.</p>'}
+
+    <div class="secao nova-pagina">Não vieram (${r.naoVieram.length})</div>
+    ${r.naoVieram.length ? tabela(r.naoVieram, false) : '<p class="gerada">Todo mundo da lista entrou.</p>'}`;
+
+  abrirParaImprimir(folhaDeImpressao('Fechamento da noite', corpo));
+}
+
+// A conexão voltou: sobe o que está esperando.
+window.addEventListener('online', () => escoarFila());
+// E de tempos em tempos, porque "online" mente em wi-fi de salão: o aparelho
+// diz que está conectado antes de a rede realmente responder.
+setInterval(() => escoarFila(), 20000);
+
+// A única porta para fora. O app.js chama isto quando o link é de portaria.
+window.telaPortaria = telaPortaria;
+})();
 
 </script>
 </body>
