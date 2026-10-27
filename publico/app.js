@@ -4070,6 +4070,27 @@ async function telaEventoPublico(token) {
     return;
   }
 
+  // RESPOSTA SEM A FESTA (27/10/2026). Uma resposta "certa" sem os dados —
+  // servidor reiniciando num deploy, por exemplo — desenhava uma tela vazia:
+  // "Convite", "data a confirmar", "vale por mais e", e um botão de comprar
+  // que levava a lugar nenhum. Uma formanda chegou a ela pelo e-mail de nomear
+  // os convites. Sem nome de festa, não há o que mostrar: pede para tentar de novo.
+  if (!evento || !evento.nome) {
+    app.innerHTML = `
+      <div class="entrar-caixa">
+        ${marca()}
+        <div class="cartao">
+          <div class="kicker">Convite</div>
+          <h1>Não abriu <span class="grifo">agora</span></h1>
+          <p class="sub">A página da festa não carregou. Espere alguns segundos e tente de novo — o link continua valendo.</p>
+          <button class="botao" id="tentar">Tentar de novo</button>
+        </div>
+        ${notaRodape()}
+      </div>`;
+    app.querySelector('#tentar').addEventListener('click', () => telaEventoPublico(token));
+    return;
+  }
+
   // O token fica guardado: é ele que reabre a compra depois do prazo, e o
   // adaptador o manda em toda a conversa da compra.
   try { sessionStorage.setItem('area-formando:liberacao', token); } catch { /* segue sem guardar */ }
@@ -4081,6 +4102,9 @@ async function telaEventoPublico(token) {
 
   const l = evento.local || {};
   const quando = evento.data ? dataLonga(evento.data) : 'data a confirmar';
+  // A lista de nomes fica aberta até `nomearAte` (inclusive), no dia de Brasília.
+  const hojeBr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+  const podeNomear = !evento.convidadoDe && !!evento.nomearAte && hojeBr <= String(evento.nomearAte).slice(0, 10);
   // O PREÇO NÃO APARECE AQUI (21/10/2026).
   //
   // Esta tela mostrava o valor antes de saber quem está do outro lado, e isso
@@ -4137,10 +4161,22 @@ async function telaEventoPublico(token) {
           o ingresso na porta. Então a tela muda de função em vez de morrer —
           o botão deixa de prometer uma compra que o servidor vai recusar.
         */''}
-        <button class="botao" id="comprar" style="margin-top:14px">
+        ${/*
+          NOMEAR TEM PORTA PRÓPRIA (27/10/2026).
+
+          O e-mail "Dizer quem usa meus convites" traz para esta página, e ela
+          só oferecia "Comprar meu convite". A tela de nomes existe, mas aparecia
+          só depois do CPF, atrás do botão de comprar — e quem quer dar um nome
+          não aperta "comprar". A formanda achou que o link estava errado.
+          O convidado de um link compartilhado não nomeia: ele não é o formando.
+        */''}
+        ${podeNomear ? `
+          <button class="botao" id="nomear-convites" style="margin-top:14px">Dizer quem usa meus convites</button>` : ''}
+
+        <button class="botao ${podeNomear ? 'secundario' : ''}" id="comprar" style="margin-top:${podeNomear ? '10' : '14'}px">
           ${evento.podeComprar === false
             ? 'Ver meu ingresso'
-            : (evento.convidadoDe ? 'Comprar o convite' : 'Comprar meu convite')}
+            : (evento.convidadoDe ? 'Comprar o convite' : (podeNomear ? 'Comprar mais convites' : 'Comprar meu convite'))}
         </button>
 
         <p class="rodape-nota" style="margin-top:10px">
@@ -4151,7 +4187,10 @@ async function telaEventoPublico(token) {
               ? `Este link foi compartilhado por <b>${escapar(evento.convidadoDe)}</b> e vale por mais
                  ${escapar(horasLegiveis(evento.horasRestantes))}. O convite que você comprar fica no nome que você
                  informar, como convidado de ${escapar(evento.convidadoDe)} — não é preciso CPF.`
-              : `Este link vale por mais ${escapar(horasLegiveis(evento.horasRestantes))} e foi liberado para você pela
+              : podeNomear
+                ? `Para dizer os nomes ou comprar, confirmamos o seu CPF com um código no WhatsApp.
+                   Os nomes podem ser trocados até ${escapar(dataCurta(evento.nomearAte))}.`
+                : `Este link vale por mais ${escapar(horasLegiveis(evento.horasRestantes))} e foi liberado para você pela
                  equipe. Para comprar, confirmamos o seu CPF com um código — o convite entra no seu contrato.`}
         </p>
       </div>
@@ -4161,9 +4200,14 @@ async function telaEventoPublico(token) {
   // LINK COMPARTILHADO PELO FORMANDO: sem CPF (20/10/2026). O link já diz de
   // quem é o convite, e pedir o CPF de um terceiro não provaria nada — ele
   // não é o formando. Quem autoriza é quem compartilhou.
-  app.querySelector('#comprar').addEventListener('click', () =>
-    evento.convidadoDe ? entrarComoConvidado(token, evento) : telaEventoCpf(token, evento),
-  );
+  app.querySelector('#comprar').addEventListener('click', () => {
+    compraEvento.destino = null;
+    return evento.convidadoDe ? entrarComoConvidado(token, evento) : telaEventoCpf(token, evento);
+  });
+  app.querySelector('#nomear-convites')?.addEventListener('click', () => {
+    compraEvento.destino = 'nomear';
+    telaEventoCpf(token, evento);
+  });
 }
 
 /** Entra pelo link que o formando compartilhou: o token basta. */
@@ -4248,7 +4292,7 @@ function telaEventoCodigo(token, evento, envio, erro) {
             <input id="codigo" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000" />
           </div>
           ${erro ? `<p class="erro">${escapar(erro)}</p>` : ''}
-          <button class="botao" type="submit">Entrar e comprar</button>
+          <button class="botao" type="submit">${compraEvento.destino === 'nomear' ? 'Entrar' : 'Entrar e comprar'}</button>
         </form>
         <button class="link-inline" id="voltar" style="margin-top:10px">usar outro CPF</button>
       </div>
@@ -4403,6 +4447,14 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
 
   // COMPRA ENCERRADA: a tela de escolher quantidade não tem o que oferecer.
   // Quem entra agora está atrás do que já comprou.
+  // Veio pelo botão de nomear: vai direto aos campos de nome. Sem convite
+  // nesta festa, cai na tela de sempre, que diz o que ele tem e oferece comprar.
+  if (compraEvento.destino === 'nomear' && compraEvento.meusConvites?.convites > 0) {
+    compraEvento.destino = null;
+    return telaNomearConvites();
+  }
+  compraEvento.destino = null;
+
   if (compraEvento.evento?.podeComprar === false) return telaMeusIngressos();
 
   telaComprarIngresso();
@@ -4519,6 +4571,8 @@ const compraEvento = {
   nomes: [],
   /** Comprovantes das compras já concluídas desta festa. */
   jaComprados: [],
+  /** 'nomear' quando entrou pelo botão "Dizer quem usa meus convites". */
+  destino: null,
 };
 
 async function pedirComAcesso(caminho, opcoes = {}) {
