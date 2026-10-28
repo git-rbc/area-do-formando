@@ -4162,36 +4162,40 @@ async function telaEventoPublico(token) {
           o botão deixa de prometer uma compra que o servidor vai recusar.
         */''}
         ${/*
-          NOMEAR TEM PORTA PRÓPRIA (27/10/2026).
+          UMA PORTA SÓ: ENTRAR (27/10/2026).
 
-          O e-mail "Dizer quem usa meus convites" traz para esta página, e ela
-          só oferecia "Comprar meu convite". A tela de nomes existe, mas aparecia
-          só depois do CPF, atrás do botão de comprar — e quem quer dar um nome
-          não aperta "comprar". A formanda achou que o link estava errado.
-          O convidado de um link compartilhado não nomeia: ele não é o formando.
+          Esta página teve, por algumas horas, dois botões antes do login —
+          "Dizer quem usa meus convites" e "Comprar". Resolvia um problema
+          real (quem vinha do e-mail de nomes não achava a tela) e criava
+          outro: a página pergunta o que a pessoa quer ANTES de saber quem
+          ela é, e portanto antes de saber se ela TEM convite. Quem não tinha
+          nenhum via um botão de nomear que não levava a nada.
+
+          Agora a página faz uma coisa só: mostra a festa e abre o login. A
+          escolha vem depois, em `telaEscolherAcao`, já sabendo quantos
+          convites a pessoa tem e quantos estão sem nome.
+
+          O convidado de um link compartilhado segue direto para a compra:
+          ele não é o formando, não tem convite para nomear e não faz login.
         */''}
-        ${podeNomear ? `
-          <button class="botao" id="nomear-convites" style="margin-top:14px">Dizer quem usa meus convites</button>` : ''}
-
-        <button class="botao ${podeNomear ? 'secundario' : ''}" id="comprar" style="margin-top:${podeNomear ? '10' : '14'}px">
-          ${evento.podeComprar === false
-            ? 'Ver meu ingresso'
-            : (evento.convidadoDe ? 'Comprar o convite' : (podeNomear ? 'Comprar mais convites' : 'Comprar meu convite'))}
+        <button class="botao" id="entrar-evento" style="margin-top:14px">
+          ${evento.convidadoDe ? 'Comprar o convite' : 'Entrar com meu CPF'}
         </button>
 
         <p class="rodape-nota" style="margin-top:10px">
-          ${evento.podeComprar === false
-            ? `As compras para esta festa se encerraram${evento.compraAte ? ` em ${escapar(dataDoInstante(evento.compraAte))}` : ''}.
-               Você ainda pode entrar com o seu CPF para ver os ingressos que já comprou e apresentá-los na entrada.`
-            : evento.convidadoDe
-              ? `Este link foi compartilhado por <b>${escapar(evento.convidadoDe)}</b> e vale por mais
-                 ${escapar(horasLegiveis(evento.horasRestantes))}. O convite que você comprar fica no nome que você
-                 informar, como convidado de ${escapar(evento.convidadoDe)} — não é preciso CPF.`
+          ${evento.convidadoDe
+            ? `Este link foi compartilhado por <b>${escapar(evento.convidadoDe)}</b> e vale por mais
+               ${escapar(horasLegiveis(evento.horasRestantes))}. O convite que você comprar fica no nome que você
+               informar, como convidado de ${escapar(evento.convidadoDe)} — não é preciso CPF.`
+            : evento.podeComprar === false
+              ? `As compras para esta festa se encerraram${evento.compraAte ? ` em ${escapar(dataDoInstante(evento.compraAte))}` : ''}.
+                 Entre com o seu CPF para ver os ingressos que já comprou e apresentá-los na entrada.`
               : podeNomear
-                ? `Para dizer os nomes ou comprar, confirmamos o seu CPF com um código no WhatsApp.
-                   Os nomes podem ser trocados até ${escapar(dataCurta(evento.nomearAte))}.`
+                ? `Confirmamos o seu CPF com um código no WhatsApp. Depois você escolhe: dizer quem usa os
+                   convites que já tem, ou comprar mais. Os nomes podem ser trocados até
+                   ${escapar(dataCurta(evento.nomearAte))}.`
                 : `Este link vale por mais ${escapar(horasLegiveis(evento.horasRestantes))} e foi liberado para você pela
-                 equipe. Para comprar, confirmamos o seu CPF com um código — o convite entra no seu contrato.`}
+                 equipe. Confirmamos o seu CPF com um código — o convite entra no seu contrato.`}
         </p>
       </div>
       ${notaRodape()}
@@ -4200,13 +4204,9 @@ async function telaEventoPublico(token) {
   // LINK COMPARTILHADO PELO FORMANDO: sem CPF (20/10/2026). O link já diz de
   // quem é o convite, e pedir o CPF de um terceiro não provaria nada — ele
   // não é o formando. Quem autoriza é quem compartilhou.
-  app.querySelector('#comprar').addEventListener('click', () => {
+  app.querySelector('#entrar-evento').addEventListener('click', () => {
     compraEvento.destino = null;
     return evento.convidadoDe ? entrarComoConvidado(token, evento) : telaEventoCpf(token, evento);
-  });
-  app.querySelector('#nomear-convites')?.addEventListener('click', () => {
-    compraEvento.destino = 'nomear';
-    telaEventoCpf(token, evento);
   });
 }
 
@@ -4236,7 +4236,7 @@ function telaEventoCpf(token, evento, erro) {
       <div class="cartao">
         <div class="kicker">${escapar(evento.nome)}</div>
         <h1>Confirme seu <span class="grifo">CPF</span></h1>
-        <p class="sub">Vamos mandar um código por WhatsApp ou e-mail. O convite entra no seu contrato, por isso precisamos ter certeza de que é você.</p>
+        <p class="sub">Vamos mandar um código por WhatsApp ou e-mail. Depois de entrar, você escolhe o que fazer — e, se comprar, o convite entra no seu contrato, por isso precisamos ter certeza de que é você.</p>
         <form id="form-cpf" novalidate>
           <div class="campo">
             <label for="cpf">CPF</label>
@@ -4292,7 +4292,12 @@ function telaEventoCodigo(token, evento, envio, erro) {
             <input id="codigo" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="000000" />
           </div>
           ${erro ? `<p class="erro">${escapar(erro)}</p>` : ''}
-          <button class="botao" type="submit">${compraEvento.destino === 'nomear' ? 'Entrar' : 'Entrar e comprar'}</button>
+          ${/*
+            "Entrar", e não "Entrar e comprar" (27/10/2026): desde que a
+            escolha passou para depois do login, entrar não compromete com
+            compra nenhuma — quem vem dizer um nome não está comprando nada.
+          */''}
+          <button class="botao" type="submit">Entrar</button>
         </form>
         <button class="link-inline" id="voltar" style="margin-top:10px">usar outro CPF</button>
       </div>
@@ -4443,21 +4448,113 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
     } catch (_) {
       /* sem isto a tela segue, só sem o bloco de nomear */
     }
+
+    // FOI INCLUÍDA UMA A UMA NESTA FESTA? (27/10/2026)
+    //
+    // Quem veio de outra turma tem preço de convite próprio e paga à parte.
+    // É isto que diz quanto custa o convite dela — a tela de compra de sempre
+    // leria o preço do plano da turma dela, que é de outra festa.
+    try {
+      compraEvento.participacaoAvulsa = await pedirComAcesso(
+        `/${encodeURIComponent(tokenDoEvento)}/minha-participacao`,
+      );
+    } catch (_) {
+      compraEvento.participacaoAvulsa = null;
+    }
   }
 
   // COMPRA ENCERRADA: a tela de escolher quantidade não tem o que oferecer.
   // Quem entra agora está atrás do que já comprou.
-  // Veio pelo botão de nomear: vai direto aos campos de nome. Sem convite
-  // nesta festa, cai na tela de sempre, que diz o que ele tem e oferece comprar.
-  if (compraEvento.destino === 'nomear' && compraEvento.meusConvites?.convites > 0) {
-    compraEvento.destino = null;
-    return telaNomearConvites();
-  }
   compraEvento.destino = null;
 
-  if (compraEvento.evento?.podeComprar === false) return telaMeusIngressos();
+  // DEPOIS DE ENTRAR, A ESCOLHA (27/10/2026).
+  //
+  // Antes a página perguntava o que a pessoa queria ANTES do login, quando
+  // ainda não sabia se ela tinha convite. Agora pergunta aqui, sabendo
+  // quantos ela tem e quantos estão sem nome — e só oferece o que de fato
+  // leva a algum lugar: um botão que termina em recusa é pior do que
+  // botão nenhum.
+  //
+  // Sem convite nenhum não há escolha a fazer: a pessoa veio comprar.
+  const temConvite = Number(compraEvento.meusConvites?.convites ?? 0) > 0;
+  const podeComprarAinda = compraEvento.evento?.podeComprar !== false;
+  const podeNomearAinda = temConvite && compraEvento.meusConvites?.janela?.aberta !== false;
+
+  if (temConvite && (podeComprarAinda || podeNomearAinda)) return telaEscolherAcao();
+  if (!podeComprarAinda) return telaMeusIngressos();
 
   telaComprarIngresso();
+}
+
+/**
+ * "O QUE VOCÊ QUER FAZER" — a primeira tela depois do login (27/10/2026).
+ *
+ * Só aparece para quem TEM convite nesta festa. Quem não tem cai direto na
+ * compra, porque não existe escolha a oferecer.
+ *
+ * A ordem dos botões segue o que está pendente: se falta nome, nomear vem
+ * primeiro e em destaque, porque é o que tem prazo e é o que a portaria vai
+ * procurar na noite da festa. Com tudo nomeado, comprar sobe.
+ */
+function telaEscolherAcao() {
+  const f = compraEvento.meusConvites || {};
+  const quantos = Number(f.convites ?? 0);
+  const comNome = (f.nomes || []).filter((n) => String(n?.nome ?? '').trim()).length;
+  const faltam = Math.max(0, quantos - comNome);
+  const podeComprarAinda = compraEvento.evento?.podeComprar !== false;
+  const podeNomearAinda = f.janela?.aberta !== false;
+  const fecha = f.janela?.fechaEm ? dataCurta(f.janela.fechaEm) : null;
+  const jaTem = (compraEvento.jaComprados || []).length;
+
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(compraEvento.evento.nome)}</div>
+        <h1>Você tem <span class="grifo">${quantos} convite${quantos > 1 ? 's' : ''}</span></h1>
+        <p class="sub">
+          ${faltam
+            ? `${faltam === quantos
+                ? (quantos > 1 ? 'Nenhum deles tem' : 'Ele ainda não tem')
+                : `${faltam} ${faltam > 1 ? 'ainda estão' : 'ainda está'} sem`} nome de quem vai usar.
+               É esse nome que a portaria procura na lista, na noite da festa.`
+            : `Todos já estão com nome. Dá para trocar${fecha ? ` até ${escapar(fecha)}` : ''}, se mudar o convidado.`}
+        </p>
+
+        ${podeNomearAinda ? `
+          <button class="botao ${faltam ? '' : 'secundario'}" id="ir-nomear" style="margin-top:14px">
+            ${faltam ? 'Dizer quem usa meus convites' : 'Trocar os nomes'}
+          </button>` : ''}
+
+        ${podeComprarAinda ? `
+          <button class="botao ${faltam && podeNomearAinda ? 'secundario' : ''}" id="ir-comprar" style="margin-top:10px">
+            Comprar mais convites
+          </button>` : ''}
+
+        ${jaTem ? `
+          <button class="botao secundario" id="ir-ingressos" style="margin-top:10px">Ver meus ingressos</button>` : ''}
+
+        ${/*
+          O rodapé não repete a data quando o parágrafo de cima já a disse —
+          com tudo nomeado, "Dá para trocar até 29/10" aparece lá em cima, e
+          repetir aqui só faz a tela parecer insistente.
+        */''}
+        ${!podeNomearAinda || faltam ? `
+          <p class="rodape-nota" style="margin-top:12px">
+            ${!podeNomearAinda
+              ? 'A lista de nomes desta festa já foi fechada com a produção. Para trocar algo, fale com a equipe.'
+              : fecha
+                ? `Os nomes podem ser escritos e trocados até ${escapar(fecha)}.`
+                : 'Dá para voltar e trocar os nomes depois.'}
+          </p>` : ''}
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelector('#ir-nomear')?.addEventListener('click', () => telaNomearConvites());
+  app.querySelector('#ir-comprar')?.addEventListener('click', () => telaComprarIngresso());
+  app.querySelector('#ir-ingressos')?.addEventListener('click', () => telaMeusIngressos());
 }
 
 /**
@@ -4573,6 +4670,14 @@ const compraEvento = {
   jaComprados: [],
   /** 'nomear' quando entrou pelo botão "Dizer quem usa meus convites". */
   destino: null,
+  /**
+   * Preenchido quando a pessoa foi incluída NESTA festa vindo de outra turma
+   * (27/10/2026): traz o preço do convite dela, que é próprio. Null = ela
+   * participa pela turma, como todo mundo.
+   */
+  participacaoAvulsa: null,
+  /** O rascunho da compra avulsa: quantidade, forma e a conta do servidor. */
+  avulso: null,
 };
 
 async function pedirComAcesso(caminho, opcoes = {}) {
@@ -4681,7 +4786,203 @@ function telaCompraBloqueada() {
 }
 
 /** Depois do login: escolher quantos convites e como pagar. */
+/**
+ * A COMPRA DE QUEM ENTROU AVULSA (27/10/2026).
+ *
+ * Ela é de outra turma e foi incluída nesta festa uma a uma. O convite dela
+ * tem preço próprio e é pago À PARTE — Pix ou cartão, agora —, porque o
+ * contrato dela é com a turma dela, e esta festa não é a daquele contrato.
+ *
+ * Por isso a tela é outra: a de sempre soma o convite na adesão e dilui nas
+ * parcelas, o que aqui mandaria o convite para a festa errada e cobraria num
+ * contrato que não cobre esta noite.
+ */
+function telaComprarAvulso(erro) {
+  const e = compraEvento.evento;
+  const f = compraEvento.meusConvites || {};
+  const estadoCompra = compraEvento.avulso || (compraEvento.avulso = { qtd: 1, forma: 'pix', parcelas: 1, conta: null });
+
+  const unitario = Number(compraEvento.participacaoAvulsa?.valorConvite ?? 0);
+
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(e.nome)}</div>
+        <h1>Comprar <span class="grifo">convite</span></h1>
+        <p class="sub">
+          Você foi incluída nesta festa pela equipe. O convite custa <b>${brl(unitario)}</b> e é pago agora,
+          separado das suas parcelas — ele não entra no contrato da sua turma.
+        </p>
+
+        ${erro ? `<p class="erro">${escapar(erro)}</p>` : ''}
+
+        <div class="campo">
+          <label for="qtd-avulso">Quantos convites</label>
+          <input id="qtd-avulso" inputmode="numeric" value="${estadoCompra.qtd}" />
+        </div>
+
+        ${/* O mesmo desenho da compra de sempre: a pessoa já viu essa caixa. */''}
+        <div class="secao-titulo">Como pagar</div>
+        <div class="formas-pag" id="formas-avulso">
+          <div class="forma-opcao ${estadoCompra.forma === 'pix' ? 'ativo' : ''}">
+            <button type="button" data-forma="pix" class="${estadoCompra.forma === 'pix' ? 'ativo' : ''}">Pix</button>
+          </div>
+          <div class="forma-opcao ${estadoCompra.forma === 'cartao' ? 'ativo' : ''}">
+            <button type="button" data-forma="cartao" class="${estadoCompra.forma === 'cartao' ? 'ativo' : ''}">Cartão de crédito</button>
+          </div>
+        </div>
+
+        ${estadoCompra.forma === 'cartao' ? `
+          <div class="campo">
+            <label for="parc-avulso">Em quantas vezes</label>
+            <select id="parc-avulso">
+              ${[1,2,3,4,5,6,7,8,9,10,11,12].map((n) => `
+                <option value="${n}" ${n === estadoCompra.parcelas ? 'selected' : ''}>${n}x</option>`).join('')}
+            </select>
+          </div>` : ''}
+
+        <div class="dados" style="margin-top:12px">
+          <div class="dado"><span>Convites</span><b>${estadoCompra.qtd} × ${brl(unitario)}</b></div>
+          ${estadoCompra.conta ? `
+            <div class="dado"><span>Total</span><b>${brl(estadoCompra.conta.valorCobrado)}</b></div>
+            ${estadoCompra.forma === 'cartao' && estadoCompra.conta.valorCobrado > estadoCompra.conta.valorConvites ? `
+              <div class="dado"><span>Convites sem a taxa do cartão</span><b>${brl(estadoCompra.conta.valorConvites)}</b></div>` : ''}
+          ` : ''}
+        </div>
+
+        <button class="botao" id="pagar-avulso" style="margin-top:14px">
+          ${estadoCompra.forma === 'pix' ? 'Gerar o Pix' : 'Abrir o pagamento no cartão'}
+        </button>
+        <button class="botao secundario" id="voltar-avulso" style="margin-top:10px">Voltar</button>
+
+        <p class="rodape-nota" style="margin-top:10px">
+          O convite só é liberado depois do pagamento confirmado. Assim que entrar, você volta aqui para
+          dizer quem usa cada um.
+        </p>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  const lerQtd = () => {
+    const n = parseInt(app.querySelector('#qtd-avulso').value, 10);
+    return Number.isFinite(n) && n > 0 ? n : 1;
+  };
+
+  // A conta vem do servidor, e não de uma multiplicação na tela: a taxa do
+  // cartão é regra da casa e muda sem a página saber.
+  const recalcular = async () => {
+    estadoCompra.qtd = lerQtd();
+    try {
+      estadoCompra.conta = await pedirComAcesso(`/${encodeURIComponent(compraEvento.token)}/avulso/simular`, {
+        method: 'POST',
+        body: JSON.stringify({ quantidade: estadoCompra.qtd, forma: estadoCompra.forma, parcelas: estadoCompra.parcelas }),
+      });
+      telaComprarAvulso();
+    } catch (err) {
+      telaComprarAvulso(err.message);
+    }
+  };
+
+  app.querySelector('#qtd-avulso').addEventListener('change', recalcular);
+  app.querySelectorAll('#formas-avulso [data-forma]').forEach((b) =>
+    b.addEventListener('click', () => {
+      estadoCompra.forma = b.dataset.forma;
+      estadoCompra.parcelas = 1;
+      recalcular();
+    }),
+  );
+  app.querySelector('#parc-avulso')?.addEventListener('change', (ev) => {
+    estadoCompra.parcelas = parseInt(ev.target.value, 10) || 1;
+    recalcular();
+  });
+
+  app.querySelector('#voltar-avulso').addEventListener('click', () => voltarDaNomeacao());
+
+  app.querySelector('#pagar-avulso').addEventListener('click', async () => {
+    const botao = app.querySelector('#pagar-avulso');
+    botao.disabled = true;
+    botao.textContent = 'Abrindo…';
+    try {
+      estadoCompra.qtd = lerQtd();
+      const cobranca = await pedirComAcesso(`/${encodeURIComponent(compraEvento.token)}/avulso/comprar`, {
+        method: 'POST',
+        body: JSON.stringify({ quantidade: estadoCompra.qtd, forma: estadoCompra.forma, parcelas: estadoCompra.parcelas }),
+      });
+      telaPagarAvulso(cobranca);
+    } catch (err) {
+      telaComprarAvulso(err.message);
+    }
+  });
+}
+
+/** O Pix para copiar, ou o link do cartão. */
+function telaPagarAvulso(cobranca) {
+  app.className = 'entrar';
+  const ehPix = cobranca.forma === 'pix';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(compraEvento.evento.nome)}</div>
+        <h1>${ehPix ? 'Pague o <span class="grifo">Pix</span>' : 'Pagamento no <span class="grifo">cartão</span>'}</h1>
+        <p class="sub">
+          ${cobranca.quantidade} convite(s) · <b>${brl(cobranca.valorCobrado)}</b>${
+            !ehPix && cobranca.parcelas > 1 ? ` em ${cobranca.parcelas}x` : ''
+          }
+        </p>
+
+        ${ehPix ? `
+          ${cobranca.copiaECola ? `
+            <div class="campo">
+              <label for="pix-cc">Pix copia e cola</label>
+              <textarea id="pix-cc" rows="4" readonly>${escapar(cobranca.copiaECola)}</textarea>
+            </div>
+            <button class="botao" id="copiar-pix">Copiar o código</button>
+          ` : '<p class="erro">O código do Pix não veio. Tente de novo em instantes.</p>'}
+        ` : `
+          ${cobranca.url ? `
+            <a class="botao" href="${escapar(cobranca.url)}" target="_blank" rel="noopener noreferrer">Abrir o pagamento</a>
+          ` : '<p class="erro">O link do cartão não veio. Tente de novo em instantes.</p>'}
+        `}
+
+        <button class="botao secundario" id="ja-paguei" style="margin-top:10px">Já paguei</button>
+
+        <p class="rodape-nota" style="margin-top:10px">
+          O convite entra na sua lista assim que o pagamento for confirmado — costuma levar alguns minutos.
+          Você pode fechar esta página; é só voltar pelo mesmo link.
+        </p>
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelector('#copiar-pix')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(cobranca.copiaECola);
+      avisar('Código copiado');
+    } catch (_) {
+      app.querySelector('#pix-cc').select();
+    }
+  });
+
+  // Recarrega do servidor: se o webhook já passou, os convites aparecem.
+  app.querySelector('#ja-paguei').addEventListener('click', async () => {
+    try {
+      const festas = await pedirComAcesso(`/${encodeURIComponent(compraEvento.token)}/meus-convites`);
+      compraEvento.meusConvites = Array.isArray(festas) ? (festas[0] ?? compraEvento.meusConvites) : compraEvento.meusConvites;
+    } catch (_) {
+      /* sem isto a tela segue */
+    }
+    if (Number(compraEvento.meusConvites?.convites ?? 0) > 0) return telaEscolherAcao();
+    avisar('O pagamento ainda não foi confirmado');
+  });
+}
+
 function telaComprarIngresso(erro) {
+  // Quem entrou avulsa compra por outra porta — preço próprio, pago à parte.
+  if (compraEvento.meusConvites?.avulso) return telaComprarAvulso(erro);
+
   const e = compraEvento.evento;
 
   // SEM PREÇO NÃO SE COMPRA (21/10/2026). `unitario` nulo quer dizer que o
@@ -4828,6 +5129,18 @@ function telaComprarIngresso(erro) {
  * Campo em branco não vira convidado sem nome: ele simplesmente fica para
  * depois, e a tela diz quantos faltam.
  */
+/**
+ * Onde a tela de nomes termina: na escolha, quando ela existe.
+ *
+ * Quem tem convite voltou para o balcão; quem não tem nunca chegou aqui pela
+ * escolha e cai na compra, como antes.
+ */
+function voltarDaNomeacao() {
+  const temConvite = Number(compraEvento.meusConvites?.convites ?? 0) > 0;
+  if (temConvite) return telaEscolherAcao();
+  return telaComprarIngresso();
+}
+
 function telaNomearConvites(erro) {
   const f = compraEvento.meusConvites;
   if (!f) return telaComprarIngresso();
@@ -4902,7 +5215,10 @@ function telaNomearConvites(erro) {
       ${notaRodape()}
     </div>`;
 
-  app.querySelector('#voltar').addEventListener('click', () => telaComprarIngresso());
+  // Voltar para onde se veio: desde 27/10 a primeira tela depois do login é a
+  // escolha, não a compra. Mandar para a compra quem só queria conferir um
+  // nome é oferecer gasto a quem não pediu.
+  app.querySelector('#voltar').addEventListener('click', () => voltarDaNomeacao());
 
   app.querySelector('#form-nomes')?.addEventListener('submit', async (ev) => {
     ev.preventDefault();
@@ -4923,7 +5239,7 @@ function telaNomearConvites(erro) {
       });
       compraEvento.meusConvites = Array.isArray(festas) ? (festas[0] ?? compraEvento.meusConvites) : compraEvento.meusConvites;
       avisar(nomes.length ? 'Lista salva' : 'Lista limpa');
-      telaComprarIngresso();
+      voltarDaNomeacao();
     } catch (e) {
       telaNomearConvites(e.message);
     }
