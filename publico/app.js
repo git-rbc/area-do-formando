@@ -4477,7 +4477,7 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
   //
   // Sem convite nenhum não há escolha a fazer: a pessoa veio comprar.
   const temConvite = Number(compraEvento.meusConvites?.convites ?? 0) > 0;
-  const podeComprarAinda = compraEvento.evento?.podeComprar !== false;
+  const podeComprarAinda = compraEvento.evento?.podeComprar !== false && !trazOConviteQueJaTem();
   const podeNomearAinda = temConvite && compraEvento.meusConvites?.janela?.aberta !== false;
 
   if (temConvite && (podeComprarAinda || podeNomearAinda)) return telaEscolherAcao();
@@ -4496,12 +4496,27 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
  * primeiro e em destaque, porque é o que tem prazo e é o que a portaria vai
  * procurar na noite da festa. Com tudo nomeado, comprar sobe.
  */
+/**
+ * ELA TRAZ O CONVITE QUE JÁ TINHA (28/10/2026).
+ *
+ * A equipe pode incluir numa festa alguém de outra turma de dois jeitos: ela
+ * compra o convite ali, com preço próprio, ou o convite que ela JÁ TEM passa
+ * a valer nesta festa — foi o caso da festa da turma dela ter sido juntada a
+ * esta. No segundo caso não há nada para comprar aqui: o convite dela é do
+ * contrato da turma dela, e vender outro nesta porta criaria uma cobrança
+ * fora daquele contrato. Então o botão de comprar não aparece — botão que
+ * termina em recusa é pior do que botão nenhum.
+ */
+function trazOConviteQueJaTem() {
+  return compraEvento.participacaoAvulsa?.usaConviteDaAdesao === true;
+}
+
 function telaEscolherAcao() {
   const f = compraEvento.meusConvites || {};
   const quantos = Number(f.convites ?? 0);
   const comNome = (f.nomes || []).filter((n) => String(n?.nome ?? '').trim()).length;
   const faltam = Math.max(0, quantos - comNome);
-  const podeComprarAinda = compraEvento.evento?.podeComprar !== false;
+  const podeComprarAinda = compraEvento.evento?.podeComprar !== false && !trazOConviteQueJaTem();
   const podeNomearAinda = f.janela?.aberta !== false;
   const fecha = f.janela?.fechaEm ? dataCurta(f.janela.fechaEm) : null;
   const jaTem = (compraEvento.jaComprados || []).length;
