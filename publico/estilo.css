@@ -869,6 +869,40 @@ main { max-width: none; margin: 0; }
 .pessoa.eu .inicial { background: var(--violet); color: #fff; }
 .pessoa span { font-size: 12.5px; color: var(--texto-suave); }
 
+/* Documento que não existe: a linha fica apagada e a seta vira um traço, para
+   a pessoa ver que não há o que abrir antes de tocar. */
+.item.indisponivel { opacity: .62; }
+.item.indisponivel .seta { color: var(--texto-suave); }
+.item.indisponivel .quando span { color: var(--texto-suave); }
+
+/* QUEM ESTÁ NA TURMA, EM LINHA (29/10/2026) — a mesma forma do PDF: um nome
+   por linha, separados por um fio fino. Em cartão de três colunas a turma
+   virava mosaico e ninguém achava o próprio nome numa turma de trinta. */
+.titulo-com-acao { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 30px 2px 12px; }
+.titulo-com-acao:first-child { margin-top: 2px; }
+
+.lista-turma { padding: 4px 18px; }
+.linha-colega {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+  padding: 11px 0; border-bottom: 1px solid var(--linha); font-size: 14.5px;
+}
+.linha-colega:last-child { border-bottom: 0; }
+/* quem está olhando se acha na lista sem precisar procurar */
+.linha-colega.eu .nome { font-weight: 600; color: var(--accent-txt); }
+.linha-colega i { font-style: normal; font-size: 12.5px; color: var(--texto-suave); white-space: nowrap; }
+
+/* O acessório da seção: pequeno, ao lado do título, nunca do tamanho de uma
+   decisão. No celular fica só o desenho; o `title` devolve o nome no hover. */
+.botao-ico {
+  flex: none; display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  padding: 6px 11px; border-radius: 99px; border: 1px solid var(--linha);
+  background: var(--superficie); color: var(--texto-suave);
+  font-size: 12px; font-weight: 600; letter-spacing: .02em; line-height: 1;
+}
+.botao-ico:hover { border-color: var(--violet); color: var(--accent-txt); background: var(--superficie-2); }
+.botao-ico svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+@media (max-width: 480px) { .botao-ico span { display: none; } .botao-ico { padding: 7px; } }
+
 .convite-linha { padding: 12px 0; border-bottom: 1px solid var(--linha); }
 .convite-linha:last-of-type { border-bottom: 0; }
 .convite-topo { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; font-size: 14px; }

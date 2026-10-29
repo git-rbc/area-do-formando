@@ -42,6 +42,26 @@ const recuperar = () => { try { return sessionStorage.getItem('formando_token');
 const esquecer = () => { try { sessionStorage.removeItem('formando_token'); } catch { /* ignora */ } };
 
 const brl = (v) => (v ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+/**
+ * AS DATAS DOS EVENTOS FICAM ESCONDIDAS (29/10/2026).
+ *
+ * O cronograma de 14 das 15 turmas 75xx está com o Baile de Gala em 11/09/2029
+ * — a data da 7508, gravada em todas por uma importação de 27/10. Daí nasceu,
+ * em 19/10, um único evento de baile com 15 turmas penduradas.
+ *
+ * Enquanto o cadastro não é acertado, o portal não mostra data nenhuma de
+ * evento: mostrar a errada é pior do que não mostrar, porque o formando
+ * organiza a vida pelo que lê aqui. A data do CONTRATO (`dataEvento`) está
+ * certa, mas some junto — duas datas na mesma tela, uma certa e uma errada, é
+ * exatamente a confusão que isto evita.
+ *
+ * Para trazer tudo de volta: `false` nesta linha. Nada mais.
+ */
+const DATAS_EM_BREVE = true;
+
+/** O que aparece no lugar de uma data de evento enquanto o cadastro não fecha. */
+const EM_BREVE = 'Informações em breve';
+
 const dataCurta = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—';
 const dataLonga = (iso) => iso ? new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
 /**
@@ -230,6 +250,20 @@ function telaEntrar(erro) {
         const sugerido = estado.config?.cpfExemplo ? ` Use ${mascaraCpf(estado.config.cpfExemplo)}.` : '';
         return telaEntrar(`Esse CPF não está nos dados de exemplo.${sugerido}`);
       }
+
+      // NÃO MANDA PARA A TELA DO CÓDIGO QUEM NÃO VAI RECEBER CÓDIGO
+      // (29/10/2026). O servidor responde igual para CPF que não existe, para
+      // cadastro sem e-mail nem WhatsApp e para turma que ainda não foi
+      // liberada — é de propósito, para esta tela não virar um verificador de
+      // CPF. Antes a pessoa caía na tela dos seis dígitos e esperava por um
+      // código que nunca ia chegar; agora ela lê as duas possibilidades.
+      if (r.enviado === false) {
+        return telaEntrar(
+          'Não consegui enviar o código. A Área do Formando está sendo liberada turma a turma — ' +
+            'se a sua ainda não entrou, é por isso. Confere o CPF e, se estiver certo, fala com a gente.',
+        );
+      }
+
       telaCodigo(r);
     } catch (err) {
       const mensagens = {
@@ -666,7 +700,13 @@ function cartaoDestaque(b) {
 function itemBoleto(b) {
   const atraso = b.status === 'em_atraso';
   const faixa = b.unico ? `${maiuscula(rotuloParcelas(b.unico.parcelas))} · ` : '';
-  const quando = b.status === 'pago' ? `${faixa}${b.unico ? 'pago' : 'Pago'} em ${dataCurta(b.pagoEm)}`
+  // "PAGO EM —" (29/10/2026). A data do pagamento não existe no nosso banco:
+  // `formatura_adesao_bills` guarda a fatura, e o `paid_at` fica na operadora.
+  // O portal escrevia "Pago em —" em toda parcela quitada, e numa turma com
+  // treze parcelas pagas isso parece erro de sistema. Sem a data, diz só
+  // "Pago" — que é verdade inteira, e não promete o que não temos.
+  const quando = b.status === 'pago'
+    ? `${faixa}${b.unico ? 'pago' : 'Pago'}${b.pagoEm ? ` em ${dataCurta(b.pagoEm)}` : ''}`
     : b.status === 'em_analise' ? `Venceu em ${dataCurta(b.vencimento)} · comprovante em análise`
     : atraso ? `${faixa}${b.unico ? 'venceu' : 'Venceu'} em ${dataCurta(b.vencimento)}`
     : `${faixa}${b.unico ? 'vence' : 'Vence'} em ${dataCurta(b.vencimento)}`;
@@ -765,10 +805,12 @@ function abaInicio() {
 
     <div class="cartao">
       <div class="kicker traco">Baile de gala</div>
-      <h2 class="serif" style="margin:6px 0 2px;font-size:32px">${dataLonga(t.dataEvento)}</h2>
-      <p style="margin:0;color:var(--texto-suave)">${escapar(t.espaco || t.cidade)} · ${escapar(t.cidade)}</p>
+      <h2 class="serif" style="margin:6px 0 2px;font-size:32px">${DATAS_EM_BREVE ? EM_BREVE : dataLonga(t.dataEvento)}</h2>
+      <p style="margin:0;color:var(--texto-suave)">${DATAS_EM_BREVE
+        ? 'A equipe está fechando as datas com a comissão da turma. Assim que confirmar, aparece aqui.'
+        : `${escapar(t.espaco || t.cidade)} · ${escapar(t.cidade)}`}</p>
       <div class="contagem">
-        <div><b>${dias}</b><span>dias para o baile</span></div>
+        ${DATAS_EM_BREVE ? '' : `<div><b>${dias}</b><span>dias para o baile</span></div>`}
         <div><b>${t.formandos}</b><span>formandos na turma</span></div>
         <div><b>${resumo.parcelasPagas}/${resumo.parcelas}</b><span>parcelas pagas</span></div>
       </div>
@@ -2611,6 +2653,26 @@ const simboloDaEtapa = (e) =>
 
 function abaCronograma() {
   const t = estado.turma;
+
+  // A TELA INTEIRA VIRA O AVISO enquanto o cadastro não fecha. Esconder só as
+  // datas deixaria uma lista de etapas sem quando — que é a mesma pergunta sem
+  // resposta, só que mais comprida.
+  if (DATAS_EM_BREVE) {
+    return moldura(`
+      <div class="cartao">
+        <div class="kicker traco">Da adesão ao baile</div>
+        <h2 class="serif" style="margin:8px 0 4px;font-size:30px">${EM_BREVE}</h2>
+        <p style="margin:0;color:var(--texto-suave);font-size:13.5px">
+          A equipe está fechando com a comissão da turma as datas de cada etapa — boas-vindas,
+          festa de 50%, family day e o baile. Assim que cada uma for confirmada, ela aparece aqui
+          e você recebe o aviso.
+        </p>
+      </div>
+      <p class="rodape-nota">Enquanto isso, qualquer dúvida sobre data é com a equipe pelo WhatsApp.</p>
+      ${notaRodape()}
+    `, 'as datas vêm da comissão');
+  }
+
   const etapas = [...t.cronograma].sort((a, b) => a.data.localeCompare(b.data));
   const proxima = etapas.find((e) => e.data >= hoje());
   const feitas = etapas.filter((e) => e.data < hoje()).length;
@@ -2772,26 +2834,50 @@ function ligarEtapas(etapas) {
   }));
 }
 
+/** Uma linha de "Meus documentos" — com a seta só quando há o que abrir. */
+function itemDocumento({ chave, titulo, quando, disponivel }) {
+  return `
+    <button class="item${disponivel ? '' : ' indisponivel'}" data-doc="${chave}" data-disponivel="${disponivel ? '1' : '0'}">
+      <div class="quando">
+        <strong>${escapar(titulo)}</strong>
+        <span>${escapar(quando || '')}</span>
+      </div>
+      ${disponivel ? '<div class="seta">›</div>' : '<div class="seta" aria-hidden="true">–</div>'}
+    </button>`;
+}
+
 // ---------- aba: contrato e convites ----------------------------------------
 function abaContrato() {
   const c = estado.contrato;
   moldura(`
+    ${/*
+      INDISPONÍVEL APARECE ANTES DO CLIQUE (29/10/2026).
+
+      O botão do termo chamava uma rota que não existia, e o clique morria em
+      erro de rede. Pior: na 7502, 12 das 14 adesões são do formato antigo e
+      não têm documento nenhum para buscar — ou seja, mesmo com a rota pronta,
+      a maioria continua sem PDF.
+
+      Botão que falha ensina a desconfiar da tela inteira. Agora quem não tem
+      documento vê a linha apagada com o motivo escrito, e o toque repete o
+      motivo em vez de tentar baixar.
+    */''}
     <div class="secao-titulo">Meus documentos</div>
     <div class="lista">
-      <button class="item" data-doc="termo">
-        <div class="quando">
-          <strong>Termo de adesão</strong>
-          <span>Assinado em ${dataCurta(c.termo.assinadoEm)} · ${c.termo.origem === 'docuseal' ? 'assinatura digital' : 'documento anexado'}</span>
-        </div>
-        <div class="seta">›</div>
-      </button>
-      <button class="item" data-doc="coletivo">
-        <div class="quando">
-          <strong>Contrato coletivo da turma</strong>
-          <span>${escapar(c.contratoColetivo.turma)}</span>
-        </div>
-        <div class="seta">›</div>
-      </button>
+      ${itemDocumento({
+        chave: 'termo',
+        titulo: 'Termo de adesão',
+        quando: c.termo.disponivel
+          ? `Assinado em ${dataCurta(c.termo.assinadoEm)} · assinatura digital`
+          : c.termo.motivo,
+        disponivel: c.termo.disponivel,
+      })}
+      ${itemDocumento({
+        chave: 'coletivo',
+        titulo: 'Contrato coletivo da turma',
+        quando: c.contratoColetivo.disponivel ? escapar(c.contratoColetivo.turma) : c.contratoColetivo.motivo,
+        disponivel: c.contratoColetivo.disponivel,
+      })}
     </div>
 
     <div class="secao-titulo">O que você contratou</div>
@@ -2865,7 +2951,11 @@ function abaContrato() {
 
   app.querySelector('#pedir-cancelamento')?.addEventListener('click', telaCancelamentoAviso);
   app.querySelectorAll('[data-doc]').forEach((b) => b.addEventListener('click', () => {
-    if (b.dataset.doc !== 'termo') return avisar('No ambiente real, abre o PDF por link assinado de curta duração');
+    // Sem documento, o toque repete o motivo. Tentar baixar daria erro de rede,
+    // e a pessoa levaria a culpa de um problema que não é dela.
+    if (b.dataset.disponivel === '0') {
+      return avisar(b.querySelector('.quando span')?.textContent?.trim() || 'Documento indisponível');
+    }
     if (estado.config?.demo) return avisar('No app de verdade, abre o termo assinado em PDF');
     baixarArquivo('/contrato/termo/pdf', 'termo-de-adesao.pdf');
   }));
@@ -3459,10 +3549,12 @@ function abaTurma() {
     <div class="colunas duas">
       <div class="cartao">
         <div class="kicker traco">Baile de gala</div>
-        <h2 class="serif" style="margin:6px 0 2px;font-size:30px">${dataLonga(t.dataEvento)}</h2>
-        ${t.espaco || t.cidade ? `<p style="margin:0 0 16px;color:var(--texto-suave)">${escapar([t.espaco, t.cidade].filter(Boolean).join(' · '))}</p>` : ''}
-        <div class="dado"><span>Faltam</span><b>${diasAte(t.dataEvento)} dias</b></div>
-        ${(t.cronograma.find((e) => e.tipo === 'baile') || {}).hora ? `<div class="dado"><span>Recepção</span><b>${escapar(t.cronograma.find((e) => e.tipo === 'baile').hora)}</b></div>` : ''}
+        <h2 class="serif" style="margin:6px 0 2px;font-size:30px">${DATAS_EM_BREVE ? EM_BREVE : dataLonga(t.dataEvento)}</h2>
+        ${DATAS_EM_BREVE
+          ? '<p style="margin:0 0 16px;color:var(--texto-suave);font-size:13.5px">A equipe está fechando as datas com a comissão da turma.</p>'
+          : `${t.espaco || t.cidade ? `<p style="margin:0 0 16px;color:var(--texto-suave)">${escapar([t.espaco, t.cidade].filter(Boolean).join(' · '))}</p>` : ''}
+        <div class="dado"><span>Faltam</span><b>${diasAte(t.dataEvento)} dias</b></div>`}
+        ${!DATAS_EM_BREVE && (t.cronograma.find((e) => e.tipo === 'baile') || {}).hora ? `<div class="dado"><span>Recepção</span><b>${escapar(t.cronograma.find((e) => e.tipo === 'baile').hora)}</b></div>` : ''}
       </div>
       <div class="cartao">
         <div class="dado"><span>Turma</span><b>${escapar(t.rotulo)}</b></div>
@@ -3474,20 +3566,37 @@ function abaTurma() {
 
 
     ${t.colegas?.length ? `
-      <div class="secao-titulo">Quem está na turma</div>
-      <div class="pessoas colegas">
+      ${/*
+        LISTA, NÃO CARTÕES (29/10/2026). Em cartões de três colunas a turma
+        virava um mosaico que ninguém lê em ordem — e numa turma de trinta a
+        pessoa não achava o próprio nome. Em linha é a mesma forma do PDF, que
+        é como a turma já está acostumada a ver essa lista.
+
+        O botão de baixar subiu para o lado do título e encolheu: ele é o
+        acessório da seção, não o assunto dela. O nome fica escondido no
+        celular, onde não cabe, e o `title` o devolve no hover do computador.
+      */''}
+      <div class="titulo-com-acao">
+        <div class="secao-titulo" style="margin-bottom:0">Quem está na turma</div>
+        ${temRecurso('listaDaTurmaPdf') ? `
+          <button class="botao-ico" data-lista-pdf title="Baixar lista em PDF" aria-label="Baixar lista em PDF">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+              <path d="M14 3v5h5" />
+              <path d="M12 12v5" /><path d="M9.5 14.5 12 17l2.5-2.5" />
+            </svg>
+            <span>Baixar lista</span>
+          </button>` : ''}
+      </div>
+      <div class="cartao plano lista-turma">
         ${t.colegas.map((c) => `
-          <div class="pessoa${c.souEu ? ' eu' : ''}">
-            <span class="inicial">${escapar(semMarca(c.nome).trim()[0] || '?')}</span>
-            <div>
-              <strong>${escapar(semMarca(c.nome))}</strong>
-              ${c.souEu ? '<span>você</span>' : ''}
-            </div>
+          <div class="linha-colega${c.souEu ? ' eu' : ''}">
+            <span class="nome">${escapar(semMarca(c.nome))}</span>
+            ${c.souEu ? '<i>você</i>' : ''}
           </div>`).join('')}
       </div>
       <p class="rodape-nota" style="margin-top:10px">Quem aparece aqui assinou a adesão desta turma.
-      Nada do financeiro de ninguém é mostrado — nem o seu para os outros.</p>
-      ${temRecurso('listaDaTurmaPdf') ? '<div class="acoes"><button class="botao secundario" data-lista-pdf>Baixar a lista em PDF</button></div>' : ''}` : ''}
+      Nada do financeiro de ninguém é mostrado — nem o seu para os outros.</p>` : ''}
     ${t.pacote ? `<div class="cartao">
       <div class="kicker traco">Pacote contratado</div>
       <p style="margin:6px 0 0">${escapar(t.pacote)}</p>
@@ -3518,7 +3627,7 @@ function abaTurma() {
           </div>`).join('')}
       </div>` : ''}
 
-    ${proxima ? `
+    ${proxima && !DATAS_EM_BREVE ? `
       <div class="secao-titulo">Próximo passo</div>
       <div class="cartao">
         <div class="kicker">${dataLonga(proxima.data)}</div>

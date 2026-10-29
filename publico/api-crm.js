@@ -529,19 +529,35 @@
       // Os convites moram AQUI (pedido do Dani, 14/10): o que ele já tem, o
       // que falta assinar e o que já passou do prazo. A tela de comprar fala
       // só da compra que ele está fazendo agora.
-      const [eu, fin, oferta, compras, nomes] = await Promise.all([
+      const [eu, fin, oferta, compras, nomes, termo] = await Promise.all([
         pedir('GET', '/me', null, token),
         pedir('GET', '/financeiro', null, token),
         pedir('GET', '/convites', null, token).catch(() => null),
         pedir('GET', '/convites/historico', null, token).catch(() => []),
         pedir('GET', '/convites/nomes', null, token).catch(() => []),
+        // O TERMO (29/10/2026). Até aqui o adaptador devolvia `url: null` e o
+        // botão chamava uma rota que não existia — o clique morria em erro de
+        // rede. Agora o CRM diz ANTES se dá para baixar, e por que não.
+        pedir('GET', '/contrato/termo', null, token).catch(() => null),
       ]);
       const resumo = fin.resumo || {};
       const festas = (oferta && oferta.festas) || [];
 
       return {
-        termo: { assinadoEm: null, origem: null, url: null },
-        contratoColetivo: { turma: eu.turma?.rotulo || eu.turma?.codigo || '', url: null },
+        termo: {
+          assinadoEm: termo?.assinadoEm ?? null,
+          origem: termo?.origem ?? null,
+          disponivel: termo?.disponivel === true,
+          motivo: termo?.motivo ?? 'Não foi possível consultar o seu termo agora.',
+        },
+        // O contrato coletivo é o da TURMA, guardado com a comissão: não há
+        // arquivo nosso para abrir. Dizer isso é melhor que um botão que não
+        // leva a lugar nenhum.
+        contratoColetivo: {
+          turma: eu.turma?.rotulo || eu.turma?.codigo || '',
+          disponivel: false,
+          motivo: 'O contrato coletivo fica com a comissão da turma. Peça uma cópia à equipe pelo WhatsApp.',
+        },
         contratado: {
           total: resumo.contratado || 0,
           parcelas: resumo.parcelas || 0,
