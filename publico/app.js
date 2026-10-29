@@ -4853,7 +4853,9 @@ function telaComprarAvulso(erro) {
           <div class="campo">
             <label for="parc-avulso">Em quantas vezes</label>
             <select id="parc-avulso">
-              ${[1,2,3,4,5,6,7,8,9,10,11,12].map((n) => `
+              ${/* Dez, não doze: MAX_PARCELAS_CARTAO é 10 e o servidor recusa acima
+                    disso. Oferecer 11x e 12x era entregar a recusa no fim. */''}
+              ${[1,2,3,4,5,6,7,8,9,10].map((n) => `
                 <option value="${n}" ${n === estadoCompra.parcelas ? 'selected' : ''}>${n}x</option>`).join('')}
             </select>
           </div>` : ''}
