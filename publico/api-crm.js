@@ -548,7 +548,11 @@
           assinadoEm: termo?.assinadoEm ?? null,
           origem: termo?.origem ?? null,
           disponivel: termo?.disponivel === true,
-          motivo: termo?.motivo ?? 'Não foi possível consultar o seu termo agora.',
+          // A frase do fallback vale para os dois casos em que `termo` vem
+          // nulo: a rota ainda não está em produção, ou a consulta falhou.
+          // "Não foi possível agora" convidaria a pessoa a insistir num botão
+          // que não vai abrir; isto manda para onde a cópia existe de verdade.
+          motivo: termo?.motivo ?? 'Para uma cópia do seu termo, fale com a equipe pelo WhatsApp.',
         },
         // O contrato coletivo é o da TURMA, guardado com a comissão: não há
         // arquivo nosso para abrir. Dizer isso é melhor que um botão que não
