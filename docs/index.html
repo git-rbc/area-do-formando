@@ -8785,7 +8785,89 @@ function telaPagamentoDoEvento(compra, previa) {
       avisar('Copie o código da caixa acima');
     }
   });
-  app.querySelector('#conferir').addEventListener('click', () => telaIngressoDoEvento(compra.compraId));
+  app.querySelector('#conferir').addEventListener('click', async (ev) => {
+    // POR QUE NÃO ENTROU (03/11/2026).
+    //
+    // A página da operadora diz só "Transação não processada. Refused.", e
+    // quem lê isso tenta de novo achando que o site falhou — uma formanda
+    // tentou dez vezes em cinco dias, sempre recusada por limite. O motivo
+    // vem no código da resposta; aqui ele vira frase antes de a pessoa cair
+    // na tela do ingresso e não achar ingresso nenhum.
+    const botao = ev.currentTarget;
+    botao.disabled = true;
+    try {
+      const sit = await pedirComAcesso(
+        `/${encodeURIComponent(compraEvento.token)}/compra/${encodeURIComponent(compra.compraId)}/cartao`,
+      );
+      if (sit?.estado === 'recusado' && sit.recusa) {
+        return telaCartaoRecusado(compra, sit);
+      }
+    } catch (_) {
+      /* não saber o motivo não pode travar o caminho de sempre */
+    } finally {
+      botao.disabled = false;
+    }
+    telaIngressoDoEvento(compra.compraId);
+  });
+}
+
+/**
+ * O CARTÃO FOI RECUSADO, E POR QUÊ.
+ *
+ * O que a pessoa precisa em dez segundos: que não foi o site, qual foi o
+ * motivo, e o que fazer agora. O botão de tentar de novo só aparece quando
+ * insistir tem chance — senão ele é um convite a repetir o erro.
+ */
+function telaCartaoRecusado(compra, sit) {
+  const r = sit.recusa;
+  app.className = 'entrar';
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">Pagamento não aprovado</div>
+        <h1>O cartão foi <span class="grifo">recusado</span></h1>
+        <p class="sub">${escapar(r.frase)}</p>
+        <p class="sub" style="margin-top:6px">${escapar(r.saida)}</p>
+        ${r.outroCartaoAdianta ? `
+          <p class="sub" style="margin-top:6px">
+            A cobrança continua valendo — dá para passar outro cartão nela mesma, sem refazer a compra.
+          </p>` : ''}
+
+        ${/*
+          A MESMA COBRANÇA ACEITA OUTRO CARTÃO (03/11/2026).
+
+          A fatura continua aberta depois da recusa — foi assim que a Maria
+          Clara pôde tentar dez vezes. Então, quando o problema é o cartão
+          (limite, vencido, bloqueado), o caminho mais curto não é refazer a
+          compra: é abrir a MESMA cobrança e passar outro cartão.
+
+          "Tentar de novo" é outra coisa: só aparece quando insistir no mesmo
+          cartão tem chance, que é falha momentânea do banco.
+        */''}
+        ${r.insistirAdianta && sit.url ? `
+          <a class="botao" href="${escapar(sit.url)}" target="_blank" rel="noopener" style="margin-top:14px">
+            Tentar de novo
+          </a>` : ''}
+        ${r.outroCartaoAdianta && sit.url ? `
+          <a class="botao ${r.insistirAdianta ? 'secundario' : ''}" href="${escapar(sit.url)}"
+             target="_blank" rel="noopener" style="margin-top:${r.insistirAdianta ? '10' : '14'}px">
+            Tentar com outro cartão
+          </a>` : ''}
+        <button class="botao secundario" id="trocar-forma" style="margin-top:10px">
+          Pagar com Pix
+        </button>
+        <button class="botao secundario" id="voltar-recusa" style="margin-top:10px">Voltar</button>
+
+        ${r.codigo ? `<p class="rodape-nota" style="margin-top:12px">
+          Se falar com o seu banco, o código da recusa é <b>${escapar(r.codigo)}</b>.
+        </p>` : ''}
+      </div>
+      ${notaRodape()}
+    </div>`;
+
+  app.querySelector('#trocar-forma').addEventListener('click', () => telaComprarIngresso());
+  app.querySelector('#voltar-recusa').addEventListener('click', () => voltarDaNomeacao());
 }
 
 /** O ingresso: protocolo, códigos e o PDF. */
