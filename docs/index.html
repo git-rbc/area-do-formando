@@ -6382,11 +6382,25 @@ function blocoDasCompras(historico) {
           <div class="item inerte">
             <div class="quando">
               <strong>${escapar(linhaItens(c))}</strong>
-              <span>${escapar((ESTADO_COMPRA[c.status] || {}).rotulo || c.status)}${c.pagamento === 'cartao' ? ` · cartão ${c.parcelas_cartao || 1}×` : ' · somado nas parcelas'} · ${brl(Number(c.valor_total || 0))}</span>
+              <span>${escapar((ESTADO_COMPRA[c.status] || {}).rotulo || c.status)}${comoFoiPago(c)} · ${brl(Number(c.valor_total || 0))}</span>
             </div>
           </div>`).join('')}
       </div>` : ''}
   `;
+}
+
+/**
+ * COMO A COMPRA FOI PAGA, NA LINHA DO HISTÓRICO (05/11/2026).
+ *
+ * Antes isto era um ternário: cartão ou "somado nas parcelas". O Pix não tinha
+ * ramo e caía no segundo — então quem pagou R$ 170,00 na hora, por Pix, lia no
+ * portal que o valor tinha sido somado às parcelas. É a mesma dúvida que veio
+ * pelo atendimento: "paguei e o contrato subiu, vou pagar de novo?".
+ */
+function comoFoiPago(c) {
+  if (c.pagamento === 'pix') return ' · Pix, pago na hora';
+  if (c.pagamento === 'cartao') return ` · cartão ${c.parcelas_cartao || 1}×`;
+  return ' · somado nas parcelas';
 }
 
 /**
