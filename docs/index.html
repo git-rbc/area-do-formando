@@ -6050,6 +6050,24 @@ function itemDocumento({ chave, titulo, quando, disponivel }) {
 }
 
 // ---------- aba: contrato e convites ----------------------------------------
+/**
+ * A LINHA EMBAIXO DO "TERMO DE ADESÃO" (09/11/2026).
+ *
+ * Dois defeitos moravam aqui. O primeiro: `assinado_em` é instante completo
+ * (`2026-10-06T19:14:03.085Z`) e passava pelo `dataCurta`, que espera só o dia
+ * — a tela escrevia "Assinado em Invalid Date" para todo mundo que assinou
+ * pelo DocuSeal. O segundo: "assinatura digital" era dito de qualquer termo
+ * disponível, e agora o portal também abre a via assinada NO PAPEL que a
+ * equipe anexou no CRM. Essas vieram da planilha e muitas não têm data de
+ * assinatura nenhuma, onde "Assinado em —" seria a frase.
+ */
+function assinaturaDoTermo(t) {
+  const comoFoi = t.origem === 'anexado' ? 'via assinada, anexada pela equipe' : 'assinatura digital';
+  const quando = dataDoInstante(t.assinadoEm);
+  if (quando === '—') return comoFoi.charAt(0).toUpperCase() + comoFoi.slice(1);
+  return `Assinado em ${quando} · ${comoFoi}`;
+}
+
 function abaContrato() {
   const c = estado.contrato;
   moldura(`
@@ -6070,9 +6088,7 @@ function abaContrato() {
       ${itemDocumento({
         chave: 'termo',
         titulo: 'Termo de adesão',
-        quando: c.termo.disponivel
-          ? `Assinado em ${dataCurta(c.termo.assinadoEm)} · assinatura digital`
-          : c.termo.motivo,
+        quando: c.termo.disponivel ? assinaturaDoTermo(c.termo) : c.termo.motivo,
         disponivel: c.termo.disponivel,
       })}
       ${itemDocumento({
