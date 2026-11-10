@@ -1000,11 +1000,21 @@ async function simulacaoAntecipacao() {
     .sort((a, b) => a.parcela - b.parcela);
   const vencidas = abertas.filter((b) => b.status === 'em_atraso');
 
+  // O contrato inteiro está na lista? Desde 10/11/2026 o CRM manda também as
+  // parcelas que ainda não têm boleto (o bloco de 12 só emite o atual). Quando
+  // não consegue contar (boleto extra no mesmo mês), a lista fica curta, e aí
+  // "Quitar o contrato" seria mentira: a cliente leria duas parcelas como o
+  // contrato todo (Bruna 7510, R$ 515,94 de um contrato de 22 parcelas).
+  const totalDoTermo = Number(estado.financeiro.resumo?.parcelas) || 0;
+  const noCronograma = estado.financeiro.boletos.filter((b) => !b.unico).length;
+  const faltamNoCronograma = totalDoTermo > noCronograma ? totalDoTermo - noCronograma : 0;
+  const rotuloTudo = faltamNoCronograma ? 'Pagar os boletos já emitidos' : 'Quitar o contrato';
+
   const opcoes = [
     { id: '3', rotulo: 'Próximas 3 parcelas', lista: abertas.slice(0, 3) },
     { id: '6', rotulo: 'Próximas 6 parcelas', lista: abertas.slice(0, 6) },
     { id: '12', rotulo: 'Próximas 12 parcelas', lista: abertas.slice(0, 12) },
-    { id: 'tudo', rotulo: 'Quitar o contrato', lista: abertas },
+    { id: 'tudo', rotulo: rotuloTudo, lista: abertas },
   ]
     // sem opção repetida: com 5 parcelas em aberto, "6" e "12" seriam o mesmo que quitar
     .filter((o) => o.lista.length && (o.id === 'tudo' || o.lista.length < abertas.length));
@@ -1032,7 +1042,7 @@ async function simulacaoAntecipacao() {
         <button class="opcao-antecipa" data-opcao="${i}">
           <div class="quando">
             <strong>${o.rotulo}</strong>
-            <span>${maiuscula(rotuloParcelas(sims[i].unico.parcelas))}</span>
+            <span>${maiuscula(rotuloParcelas(sims[i].unico.parcelas))}${o.id === 'tudo' && !faltamNoCronograma ? ' · todas as que faltam' : ''}</span>
           </div>
           <div class="quanto">
             <b>${brl(sims[i].totalBoleto ?? sims[i].valor)}</b>
@@ -1040,6 +1050,9 @@ async function simulacaoAntecipacao() {
           </div>
         </button>`).join('')}
     </div>
+
+    ${faltamNoCronograma ? `<p class="rodape-nota">${faltamNoCronograma === 1 ? 'Uma parcela do seu contrato ainda não tem boleto e não entra' : `${faltamNoCronograma} parcelas do seu contrato ainda não têm boleto e não entram`}
+      nestas opções. Para quitar o contrato inteiro, fale com a equipe em <b>Preciso de ajuda</b>.</p>` : ''}
 
     <div class="acoes"><button class="botao fantasma" data-fechar-folha>Fechar</button></div>
   `, (el) => {
@@ -1079,7 +1092,8 @@ function confirmarAntecipacao(opcao, sim) {
     <div class="dado"><span>Total do boleto</span><b class="destaque-valor">${brl(sim.totalBoleto ?? sim.valor)}</b></div>
 
     <p class="rodape-nota">As parcelas continuam com os boletos delas. Pagando o boleto único, elas são
-    quitadas de uma vez; se ele não for pago até o vencimento, é cancelado e nada muda nas parcelas.</p>
+    quitadas de uma vez; se ele não for pago até o vencimento, é cancelado e nada muda nas parcelas.${ps.some((p) => String(p.id).startsWith('futura-')) ? `
+    As parcelas que ainda não têm boleto entram pelo valor de hoje.` : ''}</p>
     <div class="acoes dupla">
       <button class="botao" id="gerar-unico">Gerar boleto único</button>
       <button class="botao secundario" id="voltar-antecipa">Ver outras opções</button>
