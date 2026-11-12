@@ -112,6 +112,40 @@
     return envelope.data ?? {};
   }
 
+  /**
+   * Pedido com anexos (11/11/2026, conversa dos pedidos, mig 1241). O portal
+   * guarda os arquivos como data URL; o CRM recebe `multipart` no campo
+   * `anexos`. Os outros campos vão como texto (e `campos`/`payload` como JSON).
+   * Sem anexo, segue o JSON de sempre.
+   */
+  async function enviarComAnexos(caminho, corpo, token) {
+    const { anexos = [], ...resto } = corpo || {};
+    if (!anexos.length) return pedir('POST', caminho, resto, token);
+    const forma = new FormData();
+    for (const [chave, valor] of Object.entries(resto)) {
+      if (valor == null || valor === '') continue;
+      forma.append(chave, typeof valor === 'object' ? JSON.stringify(valor) : String(valor));
+    }
+    for (const a of anexos) {
+      const blob = await (await fetch(a.conteudo)).blob();
+      forma.append('anexos', blob, a.arquivo || 'anexo');
+    }
+    // Sem `content-type`: o navegador monta o limite do multipart.
+    const r = await fetch(url(caminho), {
+      method: 'POST',
+      headers: { ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      body: forma,
+    });
+    const envelope = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      const erro = new Error(envelope.message || 'falha');
+      erro.status = r.status;
+      if (envelope.message) erro.detalhe = envelope.message;
+      throw erro;
+    }
+    return envelope.data ?? {};
+  }
+
   /** Destinos vêm mascarados numa lista; a tela mostra por canal. */
   function porCanal(destinos) {
     const lista = Array.isArray(destinos) ? destinos : [];
@@ -318,7 +352,7 @@
       // corrigir volta como motivo.
       if (r.motivo === 'cpf_invalido') throw new Error('cpf_invalido');
       if (r.motivo === 'aguarde') throw new Error('aguarde');
-      if (r.motivo === 'muitas_tentativas') throw new Error('muitas_tentativas');
+      if (r.motivo === 'muitas_tentativas') throw Object.assign(new Error('muitas_tentativas'), { corpo: { minutos: r.minutos } });
       return { cadastrado: true, destinos: porCanal([]) };
     }
 
@@ -494,7 +528,8 @@
       try {
         // O corpo do protótipo já é o que a API quer; o resto (motivo,
         // quantidade, tipo de convite) vai inteiro como memória do pedido.
-        return await pedir('POST', '/solicitacoes', corpo || {}, token);
+        // Com anexo vai em multipart (ver enviarComAnexos); sem, JSON.
+        return await enviarComAnexos('/solicitacoes', corpo || {}, token);
       } catch (err) {
         // 409 é a contestação já aberta — a tela sabe falar disso.
         // 409 da contestação tem tela própria; os outros (cancelamento já pedido)
@@ -507,6 +542,19 @@
       const r = await pedir('GET', '/solicitacoes', null, token);
       return { solicitacoes: r.solicitacoes || [] };
     }
+    // A conversa do pedido (mig 1241): ler, responder (com anexo) e abrir anexo.
+    // O anexo volta como link assinado (`url`), não como o arquivo.
+    if (/^\/solicitacoes\/[\w-]+\/mensagens$/.test(caminho) && metodo === 'POST') {
+      try {
+        return await enviarComAnexos(caminho, corpo || {}, token);
+      } catch (err) {
+        if (err.status === 409) throw new Error('pedido_encerrado');
+        throw err;
+      }
+    }
+    if (/^\/solicitacoes\/[\w-]+(\/anexos\/[\w-]+)?$/.test(caminho)) return pedir('GET', caminho, null, token);
+    // Aviso no celular (mig 1247): mesmo caminho e corpo dos dois lados.
+    if (caminho.startsWith('/push/')) return pedir(metodo, caminho, corpo, token);
 
     // ── config ───────────────────────────────────────────────────────────────
     // Sem isto, `estado.config` ficava indefinido e três coisas quebravam sem

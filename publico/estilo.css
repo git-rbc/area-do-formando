@@ -340,6 +340,9 @@ main { padding: 26px 28px calc(48px + var(--base)); max-width: var(--coluna); ma
 /* "em atraso" puxa mais para o vermelho que os outros selos, sem gritar */
 .s-em_atraso { background: rgba(214, 64, 52, .24); color: #F6A59C; }
 :root[data-tema="claro"] .faixa-central .s-em_atraso { background: rgba(200, 48, 38, .14); color: #B3261E; }
+/* 11/11/2026: na folha clara (Meus pedidos) o rosa claro sumia — e é o "Aguardando você", o selo que mais importa */
+.folha .s-em_atraso { background: rgba(200, 48, 38, .12); color: #B3261E; }
+:root[data-tema="escuro"] .folha .s-em_atraso { background: rgba(214, 64, 52, .24); color: #F6A59C; }
 .s-agendado { background: rgba(201, 162, 75, .18); color: var(--dourado-txt); }
 .s-nao_gerado { background: var(--superficie-2); color: var(--texto-suave); }
 @media (prefers-color-scheme: dark) { :root:not([data-tema="claro"]) .s-em_aberto { color: var(--violet-soft); } }
@@ -1461,3 +1464,50 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
 .pico-trilho { flex: 1; height: 8px; border-radius: 4px; background: var(--linha); overflow: hidden; }
 .pico-trilho i { display: block; height: 100%; background: var(--violet); }
 .pico-barra b { flex: 0 0 24px; text-align: right; color: var(--accent-txt); }
+
+/* ---------- preciso de ajuda por tema + conversa do pedido (11/11/2026) ---------- */
+.olho-ajuda { font-size: .62rem; font-weight: 600; letter-spacing: .3em; text-transform: uppercase; color: var(--texto-suave); margin-bottom: 6px; }
+.acoes-empilhadas { display: grid; gap: 8px; margin-top: 14px; }
+.ainda-preciso { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--linha); font-size: 13.5px; color: var(--texto-suave); }
+.ainda-preciso .link-inline { font-weight: 600; }
+
+.chips-ajuda { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-ajuda {
+  padding: 9px 14px; border: 1px solid var(--linha); border-radius: 99px; background: var(--superficie);
+  font-size: 13.5px; cursor: pointer; transition: background .15s, border-color .15s;
+}
+.chip-ajuda:hover { border-color: var(--violet); }
+.chip-ajuda.marcado { background: var(--violet); border-color: var(--violet); color: #fff; }
+
+.anexos-lista { display: grid; gap: 8px; margin-bottom: 8px; }
+.anexos-lista:empty { display: none; }
+.anexo-escolhido { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--linha); border-radius: var(--raio); background: var(--superficie); }
+.anexo-escolhido img { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; }
+.anexo-escolhido .ico svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+.anexo-escolhido .nome { flex: 1; min-width: 0; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.anexo-escolhido .nome small { display: block; color: var(--texto-suave); font-size: 12px; }
+.botao-anexar { display: inline-flex; align-items: center; gap: 8px; }
+.botao-anexar svg, #ajuda-parcela svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+#ajuda-parcela { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+
+.conversa { display: flex; flex-direction: column; gap: 10px; margin: 18px 0 8px; }
+.msg { max-width: 88%; padding: 12px 14px; border-radius: 12px; font-size: 14px; line-height: 1.5; }
+.msg.formando { align-self: flex-end; background: rgba(123, 78, 194, .12); border-bottom-right-radius: 3px; }
+.msg.equipe { align-self: flex-start; background: var(--superficie-2); border: 1px solid var(--linha); border-bottom-left-radius: 3px; }
+.msg-autor { font-size: 11.5px; font-weight: 600; letter-spacing: .04em; color: var(--texto-suave); margin-bottom: 4px; }
+.msg-autor time { font-weight: 400; margin-left: 4px; }
+.msg-campos { display: grid; gap: 4px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--linha); font-size: 13px; }
+.msg-campos div { display: flex; gap: 8px; justify-content: space-between; }
+.msg-campos span { color: var(--texto-suave); }
+.msg-campos b { font-weight: 600; text-align: right; }
+.msg-anexos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.msg-anexo { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 6px 10px; border: 1px solid var(--linha); border-radius: 99px; background: var(--superficie); font-size: 12.5px; cursor: pointer; }
+.msg-anexo span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.msg-anexo svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.6; flex: none; }
+.conversa-nota { align-self: center; font-size: 12.5px; color: var(--texto-suave); text-align: center; padding: 4px 10px; }
+.responder-pedido { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--linha); }
+.responder-pedido .dica { margin-bottom: 10px; font-size: 13px; color: var(--texto-suave); }
+
+/* Aviso no celular (12/11/2026): texto em cima, botão embaixo, à esquerda. */
+.faixa.avisos { flex-direction: column; gap: 10px; }
+.faixa.avisos .botao { align-self: flex-start; padding: 8px 16px; font-size: 13px; }

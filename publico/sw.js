@@ -3,13 +3,13 @@
 // Faz duas coisas, sem inventar cache esperto:
 //  1. guarda a casca do site (página, estilo, fonte, logo) para abrir mesmo sem
 //     internet — quem instalou na tela de início não vê tela de erro do navegador;
-//  2. deixa a porta pronta para a notificação (push), que só passa a chegar
-//     quando o servidor tiver as chaves e o envio ligado.
+//  2. mostra a notificação (push) que o CRM manda quando a equipe responde um
+//     pedido (12/11/2026, mig 1247) — o toque abre o pedido.
 //
 // Regra: dado do formando NUNCA entra em cache. Só a casca. Todo pedido a
 // /area-formando/ vai direto para a rede.
 
-const VERSAO = 'formando-v2';
+const VERSAO = 'formando-v3';
 const CASCA = ['./', './index.html', './estilo.css', './app.js', './logo-formaturas.png', './Daniel.ttf', './manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
@@ -47,7 +47,7 @@ self.addEventListener('fetch', (e) => {
   );
 });
 
-// Notificação: chega pronta quando o envio for ligado no servidor.
+// Notificação: o CRM manda { titulo, texto, url } (url = portal com ?pedido=<id>).
 self.addEventListener('push', (e) => {
   let dados = {};
   try { dados = e.data ? e.data.json() : {}; } catch { dados = {}; }
@@ -65,7 +65,9 @@ self.addEventListener('notificationclick', (e) => {
   const destino = (e.notification.data && e.notification.data.url) || './';
   e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then((abas) => {
     const aberta = abas.find((a) => a.url.includes(location.origin));
-    if (aberta) return aberta.focus();
-    return clients.openWindow(destino);
+    if (!aberta) return clients.openWindow(destino);
+    // Portal já aberto: leva a aba até o pedido (recarrega com ?pedido=) e traz para a frente.
+    const ir = aberta.navigate ? aberta.navigate(destino).catch(() => aberta) : Promise.resolve(aberta);
+    return ir.then((c) => (c || aberta).focus());
   }));
 });

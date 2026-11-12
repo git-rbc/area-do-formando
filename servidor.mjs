@@ -26,12 +26,13 @@ const DADOS = JSON.parse(fs.readFileSync(path.join(AQUI, 'dados', 'exemplo.json'
 const HOJE = DADOS.hojeSimulado || new Date().toISOString().slice(0, 10);
 
 // Regras da Parte 6 do plano.
-const OTP = { expiraMs: 10 * 60 * 1000, tentativas: 5, tetoDiario: 10, janelaMs: 60 * 1000 };
+// Teto por HORA (11/11/2026), o mesmo do CRM: 5 códigos em qualquer janela de 1 hora.
+const OTP = { expiraMs: 10 * 60 * 1000, tentativas: 5, tetoNaHora: 5, horaMs: 60 * 60 * 1000, janelaMs: 60 * 1000 };
 
 // Estado em memória (equivale a formatura_otp_codes, formatura_acessos,
 // formatura_solicitacoes). Some quando o servidor reinicia.
 const codigos = new Map();      // cpf -> { hash, expiraEm, tentativas, criadoEm, canais }
-const pedidosDoDia = new Map(); // cpf -> { dia, quantidade }
+const pedidosNaHora = new Map(); // cpf -> [instantes dos pedidos da última hora]
 const acessos = [];             // { adesaoId, entrouEm, tela, ip }
 const solicitacoes = [];        // { id, adesaoId, tipo, payload, status, criadoEm }
 const contatoPendente = new Map(); // adesaoId -> { email, telefone, pedidoEm }
@@ -464,8 +465,110 @@ const TIPOS_SOLICITACAO = {
   quitacao: 'Declaração de quitação',
   pagamento_duplicado: 'Pagamento em duplicidade',
   cancelamento: 'Pedido de cancelamento da adesão',
+  // 11/11/2026 — os assuntos do "Preciso de ajuda" por tema.
+  boleto: 'Boleto ou 2ª via',
+  convites: 'Convites',
+  convite_compra: 'Compra de convite',
+  evento: 'Eventos e cronograma',
+  contrato: 'Contrato',
+  troca_turma: 'Troca de turma ou curso',
+  dados_cadastro: 'Correção de cadastro',
+  cancelamento_duvida: 'Dúvida sobre adesão cancelada',
   outro: 'Pedido para a equipe',
 };
+
+// --- pedidos: conversa, responsável e divisão por assunto (11/11/2026) --------
+// Status com os MESMOS nomes do CRM (mig 945), mais "aguardando_formando": a
+// equipe perguntou algo e o pedido sai da fila dela até o formando responder.
+const STATUS_ABERTOS = new Set(['aberta', 'pendente', 'em_atendimento', 'aguardando_formando']);
+const estaAberta = (s) => STATUS_ABERTOS.has(s.status);
+
+// Quem atende. A mesma divisão da migration 1241 (Dani, 11/11/2026: a Ester saiu
+// do financeiro; "Incluir a Daiane no financeiro e a Camylla no relacionamento").
+const EQUIPE = [
+  { id: 'daiane', nome: 'Daiane Bortoli', setor: 'Financeiro' },
+  { id: 'wyllian', nome: 'Wyllian Moura', setor: 'Financeiro' },
+  { id: 'camyla', nome: 'Camyla Cecchin', setor: 'Relacionamento formaturas' },
+  { id: 'taynara', nome: 'Taynara Guesser', setor: 'Relacionamento formaturas' },
+  { id: 'aline', nome: 'Aline Passos', setor: 'Gestão' },
+];
+const nomeDaEquipe = (id) => EQUIPE.find((p) => p.id === id)?.nome || 'Sem atendente';
+
+// O GRUPO de cada FILA (Dani, 11/11/2026, segunda versão), o mesmo da migration 1241:
+// "Daiane fica com negociação e cancelamento; Taynara e Camyla com o restante".
+// Só distribui: todas veem e fazem tudo. Negociação e cancelamento saem do tipo e passam
+// na frente do tema. O pedido chega para o grupo e fica com quem assumir.
+const DIVISAO = [
+  { tema: 'negociacao', rotulo: 'Negociação (renegociar, antecipar)', atendentes: ['daiane'] },
+  { tema: 'cancelamento', rotulo: 'Cancelamento', atendentes: ['daiane'] },
+  { tema: 'pagamentos', rotulo: 'Pagamentos', atendentes: ['camyla', 'taynara'] },
+  { tema: 'dados', rotulo: 'Meus dados', atendentes: ['camyla', 'taynara'] },
+  { tema: 'convites', rotulo: 'Convites', atendentes: ['camyla', 'taynara'] },
+  { tema: 'eventos', rotulo: 'Eventos e cronograma', atendentes: ['camyla', 'taynara'] },
+  { tema: 'contrato', rotulo: 'Contrato', atendentes: ['camyla', 'taynara'] },
+  { tema: 'outro', rotulo: 'Outro assunto', atendentes: ['camyla', 'taynara'] },
+];
+const FILA_DO_TIPO = { renegociacao: 'negociacao', antecipacao: 'negociacao', cancelamento: 'cancelamento', cancelamento_duvida: 'cancelamento' };
+const filaDoPedido = (tipo, tema) => FILA_DO_TIPO[tipo] || tema || 'outro';
+// O tema dos tipos que nascem fora do "Preciso de ajuda" (contestação pela
+// parcela, comprovante, presença, cancelamento).
+const TEMA_DO_TIPO = {
+  contestacao: 'pagamentos', renegociacao: 'pagamentos', antecipacao: 'pagamentos', comprovante: 'pagamentos',
+  pagamento_duplicado: 'pagamentos', quitacao: 'pagamentos', boleto: 'pagamentos', lembrete: 'pagamentos',
+  convites_extras: 'convites', convites: 'convites', convite_compra: 'convites',
+  presenca: 'eventos', evento: 'eventos',
+  contrato: 'contrato', troca_turma: 'contrato', cancelamento: 'contrato', cancelamento_duvida: 'contrato',
+  dados_contato: 'dados', dados_cadastro: 'dados',
+};
+const grupoDoTema = (tema) => [...(DIVISAO.find((r) => r.tema === tema)?.atendentes || [])];
+
+let sequencialMensagem = 0;
+const anexosGuardados = new Map(); // anexoId -> { conteudo, tipo, arquivo }
+const TIPOS_ANEXO = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+const MAX_ANEXOS = 5;
+const MAX_ANEXO_BYTES = 8 * 1024 * 1024;
+
+/** Valida e guarda os anexos. Devolve { anexos } ou { erro }. */
+function guardarAnexos(lista) {
+  if (lista == null) return { anexos: [] };
+  if (!Array.isArray(lista) || lista.length > MAX_ANEXOS) return { erro: 'anexos_demais' };
+  const saida = [];
+  for (const a of lista) {
+    if (!a || !TIPOS_ANEXO.includes(a.tipo) || typeof a.conteudo !== 'string') return { erro: 'tipo_nao_aceito' };
+    if (Number(a.tamanho) > MAX_ANEXO_BYTES) return { erro: 'arquivo_grande' };
+    const id = `anx-${crypto.randomBytes(5).toString('hex')}`;
+    anexosGuardados.set(id, { conteudo: a.conteudo, tipo: a.tipo, arquivo: String(a.arquivo || 'arquivo').slice(0, 120) });
+    saida.push({ id, arquivo: String(a.arquivo || 'arquivo').slice(0, 120), tipo: a.tipo, tamanho: Number(a.tamanho) || 0 });
+  }
+  return { anexos: saida };
+}
+
+function novaMensagem(s, autor, texto, anexos = [], quem = null) {
+  sequencialMensagem += 1;
+  const m = {
+    id: `msg-${sequencialMensagem}`, autor, quem, texto: String(texto || '').slice(0, 4000),
+    anexos, criadoEm: new Date().toISOString(),
+  };
+  s.mensagens.push(m);
+  return m;
+}
+
+// Registro interno: transferência, prioridade, nota. O formando NUNCA vê.
+function novoRegistro(s, tipo, texto, quem) {
+  s.registros.push({ tipo, texto, quem: quem || 'Sistema', criadoEm: new Date().toISOString() });
+}
+
+/** O pedido como o FORMANDO lê: sem registros internos nem responsável. */
+function pedidoParaOFormando(s, { comMensagens = false } = {}) {
+  const { registros, responsavel, prioridade, adesaoId, ...resto } = s;
+  const ultima = s.mensagens[s.mensagens.length - 1] || null;
+  return {
+    ...resto,
+    aguardandoVoce: s.status === 'aguardando_formando',
+    ultimaMensagem: ultima ? { autor: ultima.autor, texto: ultima.texto.slice(0, 140), criadoEm: ultima.criadoEm } : null,
+    mensagens: comMensagens ? s.mensagens : undefined,
+  };
+}
 
 // Escada da cláusula 6.2 do Termo — a mesma que o CRM usa quando a turma não tem outra.
 const ESCADA_PENAL = { mais360: 10, de360a181: 15, de180a121: 20, de120a31: 25 };
@@ -489,9 +592,28 @@ function novaSolicitacao(adesao, tipo, payload) {
     tipo,
     rotulo: TIPOS_SOLICITACAO[tipo] || TIPOS_SOLICITACAO.outro,
     payload,
-    status: 'aberta',
+    status: 'pendente',
     criadoEm: agora.toISOString(),
+    tema: payload?.tema || TEMA_DO_TIPO[tipo] || 'outro',
+    responsavel: '',
+    prioridade: 'normal',
+    mensagens: [],
+    registros: [],
+    resolvidoEm: null,
   };
+  // O grupo do tema recebe o pedido; uma pessoa só já vira a responsável.
+  s.fila = filaDoPedido(s.tipo, s.tema);
+  s.grupo = grupoDoTema(s.fila);
+  s.responsavel = s.grupo.length === 1 ? s.grupo[0] : '';
+  const rotuloDoTema = DIVISAO.find((r) => r.tema === s.fila)?.rotulo;
+  novoRegistro(s, 'distribuicao', s.responsavel
+    ? `Distribuído para ${nomeDaEquipe(s.responsavel)} pela divisão de "${rotuloDoTema}".`
+    : s.grupo.length
+      ? `Para o grupo de "${rotuloDoTema}" (${s.grupo.map(nomeDaEquipe).join(', ')}): quem assumir fica com o pedido.`
+      : 'Ninguém na divisão deste assunto: está em "Sem atendente".');
+  // Todo pedido abre a conversa com o que o formando escreveu.
+  novaMensagem(s, 'formando', payload?.mensagem || '', payload?.anexosDaAbertura || []);
+  if (s.payload) delete s.payload.anexosDaAbertura;
   solicitacoes.push(s);
   return s;
 }
@@ -729,7 +851,7 @@ function pdfDoTermo(adesao, turma) {
 // Contestação em aberto daquela parcela — enquanto existe, a tela mostra o
 // protocolo e não deixa abrir outra.
 const contestacaoAberta = (adesaoId, billId) => {
-  const s = solicitacoes.find((x) => x.adesaoId === adesaoId && x.tipo === 'contestacao' && x.status === 'aberta' && x.payload?.billId === billId);
+  const s = solicitacoes.find((x) => x.adesaoId === adesaoId && x.tipo === 'contestacao' && estaAberta(x) && x.payload?.billId === billId);
   return s ? { protocolo: s.protocolo, criadoEm: s.criadoEm, motivo: s.payload?.motivo || null } : null;
 };
 
@@ -806,7 +928,7 @@ function notificacoes(adesao) {
 
   for (const s of solicitacoes.filter((s) => s.adesaoId === adesao.adesaoId)) {
     // chamado aberto pelo sistema: o formando fica sabendo que a equipe já está vendo
-    if (s.tipo === 'pagamento_duplicado' && s.status === 'aberta') {
+    if (s.tipo === 'pagamento_duplicado' && estaAberta(s)) {
       itens.push({
         id: `pedido-${s.id}`, tipo: 'pedido', prioridade: 1,
         titulo: 'Pagamento em duplicidade',
@@ -814,11 +936,21 @@ function notificacoes(adesao) {
         quando: s.criadoEm.slice(0, 10), ir: 'pedidos',
       });
     }
-    if (s.status !== 'aberta') {
+    // Resposta nova da equipe: o id leva a mensagem, então cada resposta volta a
+    // acender o sino (a anterior já lida não esconde a nova).
+    const ultima = (s.mensagens || []).filter((m) => m.autor === 'equipe').slice(-1)[0];
+    if (ultima && estaAberta(s)) {
       itens.push({
-        id: `pedido-${s.id}`, tipo: 'pedido', prioridade: 2,
-        titulo: `${s.rotulo}: ${s.status === 'atendida' ? 'resolvido' : 'não aprovado'}`,
-        texto: s.protocolo, quando: s.criadoEm.slice(0, 10), ir: 'pedidos',
+        id: `resposta-${ultima.id}`, tipo: 'pedido', prioridade: 1,
+        titulo: s.status === 'aguardando_formando' ? `A equipe precisa de você: ${s.payload?.assunto || s.rotulo}` : `Resposta no pedido ${s.protocolo}`,
+        texto: ultima.texto.slice(0, 90), quando: ultima.criadoEm.slice(0, 10), ir: 'pedidos', pedidoId: s.id,
+      });
+    }
+    if (!estaAberta(s)) {
+      itens.push({
+        id: `pedido-${s.id}-${s.status}`, tipo: 'pedido', prioridade: 2,
+        titulo: `${s.payload?.assunto || s.rotulo}: ${['concluida', 'atendida'].includes(s.status) ? 'resolvido' : 'não aprovado'}`,
+        texto: s.protocolo, quando: (s.resolvidoEm || s.criadoEm).slice(0, 10), ir: 'pedidos', pedidoId: s.id,
       });
     }
   }
@@ -857,7 +989,7 @@ const responder = (res, status, corpo) => {
 
 const lerCorpo = (req) => new Promise((resolve) => {
   let dados = '';
-  req.on('data', (c) => { dados += c; if (dados.length > 12e6) req.destroy(); });   // 12 MB: cabe um comprovante
+  req.on('data', (c) => { dados += c; if (dados.length > 60e6) req.destroy(); });   // 60 MB: até 5 anexos de 8 MB em base64
   req.on('end', () => { try { resolve(dados ? JSON.parse(dados) : {}); } catch { resolve({}); } });
 });
 
@@ -874,6 +1006,199 @@ function exigirFormando(req, res) {
 const registrarAcesso = (adesaoId, tela, req) => {
   acessos.push({ adesaoId, tela, entrouEm: new Date().toISOString(), ip: req.socket.remoteAddress });
 };
+
+// --- equipe: respostas prontas, prazo interno e ações -------------------------
+// Respostas prontas por assunto. {nome}, {parcela} e {protocolo} são trocados
+// na hora; a pessoa sempre pode editar antes de enviar. `acao` é o botão que o
+// texto sugere (responder, pedir informação ou concluir).
+const RESPOSTAS_PRONTAS = [
+  { tema: 'pagamentos', titulo: 'Baixa feita', acao: 'concluir',
+    texto: 'Olá, {nome}! Conferimos o seu pagamento da {parcela} e a baixa já foi feita: ela aparece como paga no portal. Obrigado por avisar!' },
+  { tema: 'pagamentos', titulo: 'Pedir comprovante', acao: 'pedir_info',
+    texto: 'Olá, {nome}! Ainda não localizamos o pagamento da {parcela}. Pode anexar aqui o comprovante, com a data e o valor pagos?' },
+  { tema: 'pagamentos', titulo: 'Proposta de negociação', acao: 'pedir_info',
+    texto: 'Olá, {nome}! Podemos juntar as parcelas vencidas num boleto único, com vencimento em 5 dias, ou dividir o valor nas próximas parcelas. Qual das duas opções fica melhor para você?' },
+  { tema: 'pagamentos', titulo: 'Duplicidade: como devolver', acao: 'pedir_info',
+    texto: 'Olá, {nome}! Confirmamos o pagamento em duplicidade da {parcela}. Prefere que o valor seja abatido da próxima parcela ou devolvido na sua conta? Se for na conta, informe banco, agência e conta no seu nome.' },
+  { tema: 'pagamentos', titulo: 'Declaração de quitação enviada', acao: 'concluir',
+    texto: 'Olá, {nome}! A sua declaração de quitação está anexada aqui. Qualquer coisa, é só responder.' },
+  { tema: 'dados', titulo: 'Cadastro corrigido', acao: 'concluir',
+    texto: 'Olá, {nome}! Corrigimos o seu cadastro conforme o documento enviado. Confira em "Meus dados".' },
+  { tema: 'dados', titulo: 'Pedir documento', acao: 'pedir_info',
+    texto: 'Olá, {nome}! Para corrigir o seu cadastro precisamos de uma foto de um documento com foto (RG ou CNH) em que o dado apareça. Pode anexar aqui?' },
+  { tema: 'convites', titulo: 'Convites liberados', acao: 'concluir',
+    texto: 'Olá, {nome}! Os seus convites já estão liberados no portal, em "Contrato e convites". Lembre de nomear cada um para a lista da portaria.' },
+  { tema: 'eventos', titulo: 'Data e local confirmados', acao: 'concluir',
+    texto: 'Olá, {nome}! A data, o horário e o local estão no Cronograma do portal. Se algo mudar, avisamos por lá e por e-mail.' },
+  { tema: 'contrato', titulo: 'Cópia do contrato', acao: 'concluir',
+    texto: 'Olá, {nome}! A cópia do seu termo de adesão está anexada aqui e também fica em "Contrato e convites" no portal.' },
+  { tema: '*', titulo: 'Pedir mais detalhes', acao: 'pedir_info',
+    texto: 'Olá, {nome}! Para resolver, precisamos de mais alguns detalhes. Pode nos contar um pouco mais aqui?' },
+  { tema: '*', titulo: 'Recebemos e estamos vendo', acao: 'responder',
+    texto: 'Olá, {nome}! Recebemos o seu pedido ({protocolo}) e já estamos verificando. Respondemos por aqui assim que tivermos a resposta.' },
+];
+
+// PRAZO INTERNO. O formando NÃO vê prazo (decisão de 22/09/2026). A equipe vê
+// há quanto tempo o formando espera: desde a última fala dele sem resposta.
+const META_HORAS = { atencao: 24, atrasado: 48 };
+function esperaDaEquipe(s) {
+  if (!['pendente', 'em_atendimento'].includes(s.status)) return null;
+  const ms = s.mensagens;
+  let desde = null;
+  for (let i = ms.length - 1; i >= 0 && ms[i].autor === 'formando'; i -= 1) desde = ms[i].criadoEm;
+  if (!desde) return null;
+  const horas = (Date.now() - new Date(desde).getTime()) / 3600000;
+  return { desde, horas: Math.round(horas * 10) / 10, nivel: horas >= META_HORAS.atrasado ? 'atrasado' : horas >= META_HORAS.atencao ? 'atencao' : 'ok' };
+}
+
+function pedidoParaAEquipe(s) {
+  const a = acharAdesao(s.adesaoId);
+  const t = a && acharTurma(a.turmaId);
+  const ultima = s.mensagens[s.mensagens.length - 1] || null;
+  return {
+    id: s.id, protocolo: s.protocolo, tipo: s.tipo, rotulo: s.rotulo, tema: s.tema,
+    assunto: s.payload?.assunto || s.rotulo, status: s.status, prioridade: s.prioridade,
+    responsavel: s.responsavel, responsavelNome: s.responsavel ? nomeDaEquipe(s.responsavel) : null,
+    grupo: s.grupo || [],
+    formando: a ? { nome: a.nome, cpf: a.cpf, turma: t?.rotulo || '' } : null,
+    criadoEm: s.criadoEm, resolvidoEm: s.resolvidoEm, espera: esperaDaEquipe(s),
+    ultimaMensagem: ultima ? { autor: ultima.autor, texto: ultima.texto.slice(0, 120), criadoEm: ultima.criadoEm } : null,
+    qtdAnexos: s.mensagens.reduce((n, m) => n + m.anexos.length, 0),
+  };
+}
+
+async function painelDoFormando(adesao) {
+  const turma = acharTurma(adesao.turmaId);
+  const boletos = await Promise.all(adesao.boletos.filter((b) => !b.unico).map((b) => projetarComValor(b, adesao.adesaoId, adesao)));
+  const minhas = presencas.get(adesao.adesaoId) || {};
+  return {
+    nome: adesao.nome, cpf: adesao.cpf, email: adesao.email, telefone: adesao.telefone, curso: adesao.curso,
+    situacao: adesao.situacao, turma: turma?.rotulo || '',
+    contrato: { total: adesao.contrato?.total, parcelas: adesao.contrato?.parcelas, assinadoEm: adesao.contrato?.assinadoEm },
+    resumo: {
+      pagas: boletos.filter((b) => b.status === 'pago').length,
+      vencidas: boletos.filter((b) => ['em_atraso', 'em_analise'].includes(b.status)).length,
+      emAberto: arredonda(boletos.filter((b) => b.status !== 'pago').reduce((n, b) => n + Number(b.totalBoleto || 0), 0)),
+    },
+    parcelas: boletos.map((b) => ({ id: b.id, parcela: b.parcela, vencimento: b.vencimento, status: b.status, total: b.totalBoleto, pagoEm: b.pagoEm || null })),
+    comprovantes: comprovantes.filter((c) => c.adesaoId === adesao.adesaoId)
+      .map((c) => ({ id: c.id, billId: c.billId, arquivo: c.arquivo, status: c.status, enviadoEm: c.enviadoEm })),
+    outrosPedidos: solicitacoes.filter((s) => s.adesaoId === adesao.adesaoId)
+      .map((s) => ({ id: s.id, protocolo: s.protocolo, rotulo: s.payload?.assunto || s.rotulo, status: s.status, criadoEm: s.criadoEm })),
+    presencas: (turma?.cronograma || []).map((e) => ({ etapa: e.etapa, data: e.data, resposta: minhas[chaveEtapa(e)] || null })),
+  };
+}
+
+async function apiDaEquipe(req, res, rota, metodo, url) {
+  if (metodo === 'GET' && rota === '/_equipe/config') {
+    return responder(res, 200, { equipe: EQUIPE, divisao: DIVISAO, respostasProntas: RESPOSTAS_PRONTAS, metaHoras: META_HORAS });
+  }
+  if (metodo === 'POST' && rota === '/_equipe/divisao') {
+    const { regras } = await lerCorpo(req);
+    for (const r of Array.isArray(regras) ? regras : []) {
+      const alvo = DIVISAO.find((d) => d.tema === r.tema);
+      if (alvo && Array.isArray(r.atendentes)) alvo.atendentes = r.atendentes.filter((id) => EQUIPE.some((p) => p.id === id));
+    }
+    return responder(res, 200, { divisao: DIVISAO });
+  }
+  // Respostas prontas: a equipe vê, edita, cria e apaga (no protótipo, em memória).
+  if (metodo === 'POST' && rota === '/_equipe/respostas') {
+    const { respostas } = await lerCorpo(req);
+    if (!Array.isArray(respostas)) return responder(res, 400, { erro: 'lista_invalida' });
+    const temas = new Set(['*', ...DIVISAO.map((d) => d.tema)]);
+    const acoes = new Set(['responder', 'pedir_info', 'concluir']);
+    const limpas = respostas
+      .map((r) => ({ tema: temas.has(r.tema) ? r.tema : '*', titulo: String(r.titulo || '').trim().slice(0, 60), acao: acoes.has(r.acao) ? r.acao : 'responder', texto: String(r.texto || '').trim().slice(0, 2000) }))
+      .filter((r) => r.titulo && r.texto);
+    RESPOSTAS_PRONTAS.splice(0, RESPOSTAS_PRONTAS.length, ...limpas);
+    return responder(res, 200, { respostasProntas: RESPOSTAS_PRONTAS });
+  }
+  if (metodo === 'GET' && rota === '/_equipe/pedidos') {
+    const lista = solicitacoes.filter((s) => s.tipo !== 'cancelamento').map(pedidoParaAEquipe)
+      .sort((a, b) => (b.espera?.horas || 0) - (a.espera?.horas || 0) || b.criadoEm.localeCompare(a.criadoEm));
+    return responder(res, 200, { pedidos: lista });
+  }
+  const mUm = rota.match(/^\/_equipe\/pedidos\/([\w-]+)$/);
+  if (metodo === 'GET' && mUm) {
+    const s = solicitacoes.find((x) => x.id === mUm[1]);
+    if (!s) return responder(res, 404, { erro: 'nao_encontrado' });
+    const adesao = acharAdesao(s.adesaoId);
+    return responder(res, 200, {
+      ...pedidoParaAEquipe(s), payload: s.payload, mensagens: s.mensagens, registros: s.registros,
+      painel: adesao ? await painelDoFormando(adesao) : null,
+    });
+  }
+  const mAnexo = rota.match(/^\/_equipe\/anexos\/([\w-]+)$/);
+  if (metodo === 'GET' && mAnexo) {
+    const a = anexosGuardados.get(mAnexo[1]);
+    return a ? responder(res, 200, a) : responder(res, 404, { erro: 'nao_encontrado' });
+  }
+  const mAcao = rota.match(/^\/_equipe\/pedidos\/([\w-]+)\/acao$/);
+  if (metodo === 'POST' && mAcao) {
+    const s = solicitacoes.find((x) => x.id === mAcao[1]);
+    if (!s) return responder(res, 404, { erro: 'nao_encontrado' });
+    const corpo = await lerCorpo(req);
+    const quem = EQUIPE.find((p) => p.id === corpo.quem) || EQUIPE[0];
+    const texto = String(corpo.texto || '').trim();
+    const guardados = guardarAnexos(corpo.anexos);
+    if (guardados.erro) return responder(res, 400, { erro: guardados.erro });
+    const fala = () => novaMensagem(s, 'equipe', texto, guardados.anexos, quem.nome);
+    switch (corpo.acao) {
+      case 'assumir':
+        if (s.responsavel !== quem.id) novoRegistro(s, 'transferencia', `${quem.nome} assumiu (antes: ${nomeDaEquipe(s.responsavel)}).`, quem.nome);
+        s.responsavel = quem.id;
+        if (s.status === 'pendente') s.status = 'em_atendimento';
+        break;
+      case 'responder':
+      case 'pedir_info':
+        if (!texto && !guardados.anexos.length) return responder(res, 400, { erro: 'texto_obrigatorio' });
+        fala();
+        s.status = corpo.acao === 'pedir_info' ? 'aguardando_formando' : 'em_atendimento';
+        if (!s.responsavel) s.responsavel = quem.id;
+        break;
+      case 'concluir':
+      case 'recusar':
+        if (corpo.acao === 'recusar' && texto.length < 5) return responder(res, 400, { erro: 'motivo_obrigatorio' });
+        if (texto || guardados.anexos.length) fala();
+        s.status = corpo.acao === 'concluir' ? 'concluida' : 'recusada';
+        s.resolvidoEm = new Date().toISOString();
+        novoRegistro(s, 'status', corpo.acao === 'concluir' ? 'Concluído.' : 'Recusado.', quem.nome);
+        break;
+      case 'nota':
+        if (!texto) return responder(res, 400, { erro: 'texto_obrigatorio' });
+        novoRegistro(s, 'nota', texto, quem.nome);
+        break;
+      case 'transferir': {
+        const para = EQUIPE.find((p) => p.id === corpo.para);
+        if (!para) return responder(res, 400, { erro: 'atendente_invalido' });
+        novoRegistro(s, 'transferencia', `Transferido de ${nomeDaEquipe(s.responsavel)} para ${para.nome}${texto ? `: ${texto}` : ''}.`, quem.nome);
+        s.responsavel = para.id;
+        break;
+      }
+      case 'prioridade':
+        if (!['normal', 'alta', 'urgente'].includes(corpo.prioridade)) return responder(res, 400, { erro: 'prioridade_invalida' });
+        novoRegistro(s, 'prioridade', `Prioridade: ${s.prioridade} → ${corpo.prioridade}.`, quem.nome);
+        s.prioridade = corpo.prioridade;
+        break;
+      case 'dar_baixa': {
+        // Atalho do painel: no CRM real é a baixa manual que já existe.
+        const adesao = acharAdesao(s.adesaoId);
+        const b = adesao?.boletos.find((x) => x.id === corpo.billId && !x.unico);
+        if (!b) return responder(res, 404, { erro: 'nao_encontrado' });
+        compensarParcela(adesao, b);
+        for (const c of comprovantes.filter((c) => c.adesaoId === adesao.adesaoId && c.billId === b.id)) c.status = 'conferido';
+        registrarHistorico(b.id, 'Baixa manual pela equipe', `Pedido ${s.protocolo}`);
+        novoRegistro(s, 'baixa', `Baixa da Parcela ${b.parcela} feita pelo painel.`, quem.nome);
+        break;
+      }
+      default:
+        return responder(res, 400, { erro: 'acao_invalida' });
+    }
+    console.log(`  [equipe] ${quem.nome} · ${s.protocolo} · ${corpo.acao}`);
+    return responder(res, 200, { ok: true });
+  }
+  return responder(res, 404, { erro: 'rota_nao_encontrada', rota });
+}
 
 async function api(req, res, url) {
   const rota = url.pathname.replace('/area-formando', '');
@@ -902,10 +1227,11 @@ async function api(req, res, url) {
 
     if (doc.length !== 11) return responder(res, 400, { erro: 'cpf_invalido' });
 
-    const dia = new Date().toISOString().slice(0, 10);
-    const contador = pedidosDoDia.get(doc);
-    const atual = contador && contador.dia === dia ? contador : { dia, quantidade: 0 };
-    if (atual.quantidade >= OTP.tetoDiario) return responder(res, 429, { erro: 'muitas_tentativas' });
+    const naHora = (pedidosNaHora.get(doc) || []).filter((t) => Date.now() - t < OTP.horaMs);
+    if (naHora.length >= OTP.tetoNaHora) {
+      const minutos = Math.max(1, Math.ceil((Math.min(...naHora) + OTP.horaMs - Date.now()) / 60000));
+      return responder(res, 429, { erro: 'muitas_tentativas', minutos });
+    }
 
     const anterior = codigos.get(doc);
     if (anterior && Date.now() - anterior.criadoEm < OTP.janelaMs) {
@@ -920,7 +1246,7 @@ async function api(req, res, url) {
 
     const codigo = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
     codigos.set(doc, { hash: hash(codigo), expiraEm: Date.now() + OTP.expiraMs, tentativas: 0, criadoEm: Date.now() });
-    pedidosDoDia.set(doc, { dia, quantidade: atual.quantidade + 1 });
+    pedidosNaHora.set(doc, [...naHora, Date.now()]);
 
     const alvo = encontradas[0];
     if (MODO_DEV) console.log(`\n  [OTP] ${alvo.nome} · CPF ${doc} · código ${codigo}\n`);
@@ -1358,7 +1684,7 @@ async function api(req, res, url) {
       },
       taxaBoleto: adesao.contrato.taxaBoleto ?? null,
       convites: adesao.convites,
-      solicitacoes: solicitacoes.filter((s) => s.adesaoId === adesao.adesaoId),
+      solicitacoes: solicitacoes.filter((s) => s.adesaoId === adesao.adesaoId).map((s) => pedidoParaOFormando(s)),
     });
   }
 
@@ -1370,7 +1696,7 @@ async function api(req, res, url) {
     const dias = dataFesta ? Math.round((new Date(`${dataFesta}T12:00:00`) - new Date(`${HOJE}T12:00:00`)) / 86400000) : null;
     const faixa = faixaPenal(dias);
     const valorAdesao = Number(adesao.contrato?.total || 0);
-    const aberto = solicitacoes.find((s) => s.adesaoId === adesao.adesaoId && s.tipo === 'cancelamento' && s.status === 'aberta');
+    const aberto = solicitacoes.find((s) => s.adesaoId === adesao.adesaoId && s.tipo === 'cancelamento' && estaAberta(s));
     return responder(res, 200, {
       // Sem valor em reais (decisão de 05/10/2026): o portal mostra só o percentual.
       dataFesta, diasAteFesta: dias, escada: ESCADA_PENAL, faixa, valorAdesao,
@@ -1387,7 +1713,7 @@ async function api(req, res, url) {
     if (tipo === 'cancelamento') {
       const p = corpoPedido.payload || {};
       if (!p.motivo || p.ciente !== true) return responder(res, 400, { erro: 'motivo_obrigatorio' });
-      if (solicitacoes.some((s) => s.adesaoId === adesao.adesaoId && s.tipo === 'cancelamento' && s.status === 'aberta')) {
+      if (solicitacoes.some((s) => s.adesaoId === adesao.adesaoId && s.tipo === 'cancelamento' && estaAberta(s))) {
         return responder(res, 409, { erro: 'cancelamento_ja_pedido' });
       }
       const s = novaSolicitacao(adesao, tipo, { ...p, mensagem: [p.motivo, p.motivoDetalhe, p.observacoes].filter(Boolean).join(' — ') });
@@ -1397,15 +1723,92 @@ async function api(req, res, url) {
     if (tipo === 'contestacao' && billId && contestacaoAberta(adesao.adesaoId, billId)) {
       return responder(res, 409, { erro: 'contestacao_ja_aberta' });
     }
+    if (billId && !adesao.boletos.some((b) => b.id === billId)) return responder(res, 404, { erro: 'nao_encontrado' });
+    const guardados = guardarAnexos(corpoPedido.anexos);
+    if (guardados.erro) return responder(res, 400, { erro: guardados.erro });
+    // Campos do formulário: o que o formando escolheu e preencheu, como ele viu.
+    const campos = (Array.isArray(corpoPedido.campos) ? corpoPedido.campos : []).slice(0, 12)
+      .map((c) => ({ rotulo: String(c?.rotulo || '').slice(0, 80), valor: String(c?.valor || '').slice(0, 500) }))
+      .filter((c) => c.rotulo && c.valor);
     const s = novaSolicitacao(adesao, tipo, {
-      mensagem: String(mensagem || '').slice(0, 1000),
+      mensagem: String(mensagem || '').slice(0, 4000),
       quantidade: quantidade || null,
       conviteTipo: conviteTipo || null,
       billId: billId || null,
       motivo: motivo || null,
+      tema: corpoPedido.tema || null,
+      assunto: corpoPedido.assunto ? String(corpoPedido.assunto).slice(0, 120) : null,
+      campos,
+      anexosDaAbertura: guardados.anexos,
     });
-    console.log(`  [${s.protocolo}] ${adesao.nome}: ${tipo}`);
-    return responder(res, 201, s);
+    // "Paguei e continua em aberto" com o comprovante anexado: a parcela entra em
+    // análise na hora, como quando ele anexa pela própria parcela.
+    if (tipo === 'contestacao' && billId && guardados.anexos.length) {
+      for (const a of guardados.anexos) {
+        comprovantes.push({
+          id: `comp-${comprovantes.length + 1}`, adesaoId: adesao.adesaoId, billId, arquivo: a.arquivo, tipo: a.tipo,
+          tamanho: a.tamanho, observacao: `Anexado no pedido ${s.protocolo}`, status: 'em_analise',
+          enviadoEm: new Date().toISOString(), conteudo: anexosGuardados.get(a.id)?.conteudo || null, protocolo: s.protocolo,
+        });
+      }
+    }
+    console.log(`  [${s.protocolo}] ${adesao.nome}: ${tipo}${guardados.anexos.length ? ` · ${guardados.anexos.length} anexo(s)` : ''} → ${nomeDaEquipe(s.responsavel)}`);
+    return responder(res, 201, pedidoParaOFormando(s));
+  }
+
+  // --- um pedido, com a conversa ---
+  const mPedido = rota.match(/^\/solicitacoes\/([\w-]+)$/);
+  if (metodo === 'GET' && mPedido) {
+    const adesao = exigirFormando(req, res); if (!adesao) return;
+    const s = solicitacoes.find((x) => x.id === mPedido[1] && x.adesaoId === adesao.adesaoId);
+    if (!s) return responder(res, 404, { erro: 'nao_encontrado' });
+    return responder(res, 200, pedidoParaOFormando(s, { comMensagens: true }));
+  }
+
+  // O formando responde. Pedido resolvido há até 7 dias volta para a equipe
+  // ("isso não resolveu"); depois disso, é pedido novo.
+  const mResponder = rota.match(/^\/solicitacoes\/([\w-]+)\/mensagens$/);
+  if (metodo === 'POST' && mResponder) {
+    const adesao = exigirFormando(req, res); if (!adesao) return;
+    const s = solicitacoes.find((x) => x.id === mResponder[1] && x.adesaoId === adesao.adesaoId);
+    if (!s) return responder(res, 404, { erro: 'nao_encontrado' });
+    const corpo = await lerCorpo(req);
+    const texto = String(corpo.texto || '').trim();
+    if (texto.length < 2 && !(corpo.anexos || []).length) return responder(res, 400, { erro: 'texto_obrigatorio' });
+    const reabre = ['concluida', 'atendida', 'recusada'].includes(s.status);
+    if (reabre && Date.now() - new Date(s.resolvidoEm || s.criadoEm).getTime() > 7 * 86400000) {
+      return responder(res, 409, { erro: 'pedido_encerrado' });
+    }
+    if (s.status === 'cancelada') return responder(res, 409, { erro: 'pedido_encerrado' });
+    const guardados = guardarAnexos(corpo.anexos);
+    if (guardados.erro) return responder(res, 400, { erro: guardados.erro });
+    novaMensagem(s, 'formando', texto, guardados.anexos);
+    if (reabre) { novoRegistro(s, 'reaberto', 'O formando respondeu depois do encerramento: o pedido voltou para a fila.'); s.resolvidoEm = null; }
+    // A bola volta para a equipe.
+    s.status = s.status === 'pendente' || reabre ? 'pendente' : 'em_atendimento';
+    console.log(`  [${s.protocolo}] ${adesao.nome} respondeu${reabre ? ' (reabriu)' : ''}`);
+    return responder(res, 201, pedidoParaOFormando(s, { comMensagens: true }));
+  }
+
+  // Ver um anexo da conversa (do formando ou da equipe).
+  const mAnexo = rota.match(/^\/solicitacoes\/([\w-]+)\/anexos\/([\w-]+)$/);
+  if (metodo === 'GET' && mAnexo) {
+    const adesao = exigirFormando(req, res); if (!adesao) return;
+    const s = solicitacoes.find((x) => x.id === mAnexo[1] && x.adesaoId === adesao.adesaoId);
+    const existe = s && s.mensagens.some((m) => m.anexos.some((a) => a.id === mAnexo[2]));
+    if (!existe) return responder(res, 404, { erro: 'nao_encontrado' });
+    return responder(res, 200, anexosGuardados.get(mAnexo[2]));
+  }
+
+  // Aviso no celular (mig 1247 no CRM). Aqui só guarda a inscrição: o protótipo
+  // não envia push (a chave é de teste, sem a privada).
+  if (metodo === 'GET' && rota === '/push/chave') {
+    if (!exigirFormando(req, res)) return;
+    return responder(res, 200, { chave: 'BCgjTepj7r_dgkeWJ1TyxWib31DMjc-19_GkI7d0P6jevjgebz0p-g6vhqoRFS1su2_Y0TT03R0vfTCiUi2h6Ek' });
+  }
+  if (metodo === 'POST' && (rota === '/push/inscricao' || rota === '/push/inscricao/remover')) {
+    if (!exigirFormando(req, res)) return;
+    return responder(res, 200, { ativo: rota === '/push/inscricao' });
   }
 
   // Todos os pedidos do formando, com protocolo e prazo — é o que responde ao
@@ -1415,7 +1818,8 @@ async function api(req, res, url) {
     return responder(res, 200, {
       solicitacoes: solicitacoes
         .filter((s) => s.adesaoId === adesao.adesaoId)
-        .sort((a, b) => b.criadoEm.localeCompare(a.criadoEm)),
+        .sort((a, b) => b.criadoEm.localeCompare(a.criadoEm))
+        .map((s) => pedidoParaOFormando(s)),
     });
   }
 
@@ -1520,6 +1924,14 @@ async function api(req, res, url) {
     return responder(res, 200, { pago: b.id });
   }
 
+  // ===== TELA DA EQUIPE (só no protótipo) =====================================
+  // Simula a fila do CRM (Área do Formando › Solicitações) para testar o
+  // atendimento de ponta a ponta: o que a equipe faz aqui o formando vê no portal.
+  if (rota.startsWith('/_equipe/')) {
+    if (!MODO_DEV) return responder(res, 404, { erro: 'rota_nao_encontrada' });
+    return apiDaEquipe(req, res, rota, metodo, url);
+  }
+
   if (metodo === 'GET' && rota === '/_acessos') {
     return responder(res, 200, { acessos: acessos.slice(-100), solicitacoes });
   }
@@ -1552,6 +1964,15 @@ function comApiDoCrm(html) {
 }
 
 function estatico(req, res, url) {
+  // A tela da equipe (simulação da fila do CRM) mora fora de publico/: ela
+  // nunca vai para o site publicado.
+  if (MODO_DEV && /^\/equipe\/?$/.test(url.pathname)) {
+    fs.readFile(path.join(AQUI, 'equipe', 'index.html'), (erro, html) => {
+      if (erro) { res.writeHead(404).end(); return; }
+      res.writeHead(200, { 'content-type': TIPOS['.html'], 'cache-control': 'no-store' }); res.end(html);
+    });
+    return;
+  }
   let caminho = url.pathname === '/' ? '/index.html' : url.pathname;
   if (caminho.startsWith('/formando')) caminho = caminho.replace(/^\/formando\/?/, '/') || '/index.html';
   const arquivo = path.join(AQUI, 'publico', path.normalize(caminho).replace(/^[\\/]+/, ''));
@@ -1586,6 +2007,7 @@ http.createServer((req, res) => {
     console.log('  Os dados são REAIS. Entre com o CPF de um formando de verdade.');
   }
   console.log(`  http://localhost:${PORTA}/`);
+  if (MODO_DEV) console.log(`  Tela da equipe (fila de pedidos): http://localhost:${PORTA}/equipe`);
   console.log('');
   console.log(`  ${DADOS.aviso}`);
   console.log(`  Data simulada: ${HOJE} · turma ${DADOS.turmas[0].rotulo}`);
