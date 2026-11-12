@@ -65,7 +65,7 @@ ${corpo}</body>
 fs.writeFileSync(path.join(DESTINO, 'index.html'), html, 'utf8');
 fs.copyFileSync(path.join(SAIDA, 'Daniel.ttf'), path.join(DESTINO, 'Daniel.ttf'));
 fs.copyFileSync(path.join(SAIDA, 'logo-formaturas.png'), path.join(DESTINO, 'logo-formaturas.png'));
-for (const f of ['manifest.webmanifest', 'sw.js', 'icone-192.png', 'icone-512.png']) {
+for (const f of ['manifest.webmanifest', 'sw.js', 'icone-192.png', 'icone-512.png', 'logo-formaturas-email.png']) {
   fs.copyFileSync(path.join(SAIDA, f), path.join(DESTINO, f));
 }
 // o .nojekyll evita que o Pages ignore arquivos; recriado se alguém apagar

@@ -145,7 +145,7 @@ fs.writeFileSync(path.join(SAIDA, 'index.html'), html, 'utf8');
 fs.copyFileSync(path.join(RAIZ, 'publico', 'Daniel.ttf'), path.join(SAIDA, 'Daniel.ttf'));
 fs.copyFileSync(path.join(RAIZ, 'publico', 'logo-formaturas.png'), path.join(SAIDA, 'logo-formaturas.png'));
 // PWA: manifesto, service worker e ícones do atalho na tela de início
-for (const f of ['manifest.webmanifest', 'sw.js', 'icone-192.png', 'icone-512.png']) {
+for (const f of ['manifest.webmanifest', 'sw.js', 'icone-192.png', 'icone-512.png', 'logo-formaturas-email.png']) {
   fs.copyFileSync(path.join(RAIZ, 'publico', f), path.join(SAIDA, f));
 }
 
