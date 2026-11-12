@@ -2169,9 +2169,28 @@ function resolverCronograma() {
 // --- o formulário ---------------------------------------------------------------
 const MAX_ANEXOS_PEDIDO = 5;
 
-function campoHtml(c, valores, ctx) {
+/**
+ * Pedidos que o CRM só aceita com a parcela (contestação, pagamento em dobro): sem parcela na lista,
+ * não há o que mandar — a tela explica em vez de travar no "Preencha".
+ */
+const PEDIDO_EXIGE_PARCELA = new Set(['contestacao', 'pagamento_duplicado']);
+
+/** O campo de parcela sem nenhuma parcela para escolher (12/11/2026: travava o envio). */
+const parcelaSemOpcao = (c) => c.tipo === 'parcela' && !parcelasDoFormando(c.filtro || (() => true)).length;
+
+/**
+ * O campo é exigido NESTE formando? A parcela obrigatória deixa de ser quando a lista vem vazia
+ * (ninguém com boleto em aberto conseguia pedir o boleto) — o formando conta na mensagem.
+ */
+function campoExigido(c, motivo) {
+  if (!c.obrigatorio) return false;
+  if (parcelaSemOpcao(c) && !PEDIDO_EXIGE_PARCELA.has(motivo?.tipo)) return false;
+  return true;
+}
+
+function campoHtml(c, valores, ctx, motivo) {
   const v = valores[c.id] ?? '';
-  const obrig = c.obrigatorio ? '' : ' <small>(opcional)</small>';
+  const obrig = campoExigido(c, motivo) ? '' : ' <small>(opcional)</small>';
   const oculto = c.mostrarSe && valores[c.mostrarSe.campo] !== c.mostrarSe.valor ? ' hidden' : '';
   if (c.tipo === 'chips') {
     return `<div class="campo" data-campo="${c.id}"${oculto}>
@@ -2188,7 +2207,9 @@ function campoHtml(c, valores, ctx) {
         <option value="">Escolha a parcela…</option>
         ${lista.map((b) => `<option value="${escapar(b.id)}"${escolhida === b.id ? ' selected' : ''}>${escapar(rotuloParcela(b))}</option>`).join('')}
       </select>
-      ${lista.length ? '' : '<div class="dica">Nenhuma parcela nessa situação.</div>'}
+      ${lista.length ? '' : PEDIDO_EXIGE_PARCELA.has(motivo?.tipo)
+    ? '<div class="dica">Nenhuma parcela em aberto com boleto. Se o pagamento foi de outra coisa, volte e escolha <b>Outro assunto</b>.</div>'
+    : '<div class="dica">Nenhuma parcela em aberto com boleto agora. Pode enviar assim mesmo: conte na mensagem qual é.</div>'}
     </div>`;
   }
   if (c.tipo === 'etapa') {
@@ -2291,7 +2312,7 @@ function formularioAjuda(motivo, erro, ctx = {}, estadoForm = null) {
     <h2>${escapar(motivo.titulo)}</h2>
     <div class="sub">Preencha o que a equipe precisa para resolver de primeira.</div>
 
-    ${motivo.campos.map((c) => campoHtml(c, f.valores, ctx)).join('')}
+    ${motivo.campos.map((c) => campoHtml(c, f.valores, ctx, motivo)).join('')}
 
     <div class="campo">
       <label for="ajuda-texto">${escapar(motivo.textoRotulo || (textoObrig ? 'O que você precisa' : 'Quer acrescentar algo?'))}${textoObrig ? '' : ' <small>(opcional)</small>'}</label>
@@ -2332,7 +2353,10 @@ function formularioAjuda(motivo, erro, ctx = {}, estadoForm = null) {
       f.texto = el.querySelector('#ajuda-texto').value.trim();
       // validação: os campos que estão à vista e são obrigatórios
       const visiveis = motivo.campos.filter((c) => !c.mostrarSe || f.valores[c.mostrarSe.campo] === c.mostrarSe.valor);
-      const faltando = visiveis.find((c) => c.obrigatorio && !String(f.valores[c.id] || '').trim());
+      const faltando = visiveis.find((c) => campoExigido(c, motivo) && !String(f.valores[c.id] || '').trim());
+      if (faltando && parcelaSemOpcao(faltando)) {
+        return formularioAjuda(motivo, 'Você não tem parcela em aberto com boleto para este pedido. Se o pagamento foi de outra coisa, volte e escolha Outro assunto.', ctx, f);
+      }
       if (faltando) return formularioAjuda(motivo, `Preencha: ${faltando.rotulo.toLowerCase()}.`, ctx, f);
       if (textoObrig && f.texto.length < 10) return formularioAjuda(motivo, 'Conte um pouco mais (pelo menos uma frase) para a equipe poder ajudar.', ctx, f);
       if (motivo.anexo === 'obrigatorio' && !f.anexos.length) return formularioAjuda(motivo, `Anexe ${(motivo.anexoRotulo || 'o arquivo').toLowerCase()}.`, ctx, f);

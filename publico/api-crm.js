@@ -252,12 +252,14 @@
       // Só o que MUDOU desde que ele pediu: pedido ainda pendente não é aviso,
       // é o estado normal de quem acabou de pedir.
       if (ABERTOS.includes(s.status)) continue;
-      const comoFicou = { concluida: 'foi resolvido', recusada: 'foi recusado', cancelada: 'foi cancelado' }[s.status];
+      // "Pedido resolvido: Convites" (12/11/2026). Antes era "<rótulo> foi resolvido", que errava a
+      // concordância com rótulo feminino ("Contestação de cobrança foi resolvido").
+      const comoFicou = { concluida: 'Pedido resolvido', recusada: 'Pedido não aprovado', cancelada: 'Pedido cancelado' }[s.status];
       if (!comoFicou) continue;
       itens.push({
         id: `pedido:${s.id}:${s.status}`,
         tipo: 'pedido',
-        titulo: `${s.rotulo || 'Seu pedido'} ${comoFicou}`,
+        titulo: `${comoFicou}: ${s.payload?.assunto || s.rotulo || 'seu pedido'}`,
         texto: s.observacao ? `${s.protocolo} · ${s.observacao}` : `${s.protocolo} · abra para ver os detalhes.`,
         ir: 'pedidos',
       });
