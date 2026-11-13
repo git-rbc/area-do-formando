@@ -794,6 +794,22 @@ function ligarPainelAtencao() {
 }
 
 // ---------- aba: início ------------------------------------------------------
+/**
+ * ADESÃO CANCELADA (A7, Dani 13/11/2026): entra no portal, vê o que é dela, abre pedido e paga os boletos
+ * que existirem (inclusive os de negociação) — mas não faz compra nova: convites, boleto único e
+ * antecipação somem da tela (e a API recusa do mesmo jeito).
+ */
+const adesaoCancelada = () => estado.eu?.situacao === 'cancelada';
+const MSG_SEM_COMPRA = 'Sua adesão foi cancelada, então compras novas não estão disponíveis.';
+
+function faixaAdesaoCancelada() {
+  if (!adesaoCancelada()) return '';
+  const quando = estado.eu?.canceladaEm ? ` em ${dataCurta(String(estado.eu.canceladaEm).slice(0, 10))}` : '';
+  return `<div class="faixa alerta"><div><b>Sua adesão foi cancelada${quando}.</b> Você continua vendo o seu
+    financeiro e o seu contrato, pode abrir pedidos em <b>Preciso de ajuda</b> e pagar os boletos que estiverem em
+    aberto. Compras novas (convites, boleto único e antecipação) não estão disponíveis.</div></div>`;
+}
+
 function abaInicio() {
   const t = estado.turma;
   const { resumo } = estado.financeiro;
@@ -802,6 +818,7 @@ function abaInicio() {
   const curso = cursoDe(estado.eu?.curso);
 
   moldura(`
+    ${faixaAdesaoCancelada()}
     ${painelAtencao()}
 
     <div class="frase">
@@ -868,7 +885,7 @@ function abaFinanceiro() {
   const filtro = FILTROS.find((f) => f.id === estado.filtro) || FILTROS[0];
   const lista = parcelas.filter(filtro.teste).sort((a, b) => (filtro.id === 'pagas' ? -1 : 1) * a.vencimento.localeCompare(b.vencimento));
   const proxima = proximaParaPagar();
-  const podeAntecipar = temRecurso('boletoUnico')
+  const podeAntecipar = temRecurso('boletoUnico') && !adesaoCancelada()
     && parcelas.some((b) => !b.unicoAtivo && ['em_aberto', 'em_atraso', 'agendado', 'nao_gerado'].includes(b.status));
 
   const emAberto = resumo.emAberto + resumo.emAtraso + (resumo.emAnalise || 0) + resumo.aEmitir;
@@ -1006,6 +1023,7 @@ function abaFinanceiro() {
 // entra pelo valor de face; vencida, com o juro de mora corrido até o
 // vencimento do boleto único.
 async function simulacaoAntecipacao() {
+  if (adesaoCancelada()) return avisar(MSG_SEM_COMPRA);
   const abertas = estado.financeiro.boletos
     .filter((b) => !b.unico && !b.unicoAtivo && ['em_aberto', 'em_atraso', 'agendado', 'nao_gerado'].includes(b.status))
     .sort((a, b) => a.parcela - b.parcela);
@@ -2125,7 +2143,7 @@ function resolverNegociacao() {
 function resolverAntecipacao() {
   return {
     html: '<div class="faixa info"><div>Você escolhe as parcelas e o portal monta um boleto único com elas, na hora. Pagando, elas são quitadas de uma vez.</div></div>',
-    botoes: temRecurso('boletoUnico') ? [{ texto: 'Escolher parcelas para adiantar', acao: simulacaoAntecipacao, principal: true }] : [],
+    botoes: temRecurso('boletoUnico') && !adesaoCancelada() ? [{ texto: 'Escolher parcelas para adiantar', acao: simulacaoAntecipacao, principal: true }] : [],
   };
 }
 
@@ -3631,7 +3649,7 @@ function abaContrato() {
       }).join('')}
       <div class="acoes">
         <button class="botao secundario" id="nomear">Dizer quem vai usar</button>
-        <button class="botao secundario" id="pedir">Comprar convites extras</button>
+        ${adesaoCancelada() ? '' : '<button class="botao secundario" id="pedir">Comprar convites extras</button>'}
       </div>
     </div>
 
@@ -4005,6 +4023,10 @@ function telaPixDoConvite(compra) {
 }
 
 async function telaConvites() {
+  if (adesaoCancelada()) {
+    return abrirFolha(`<h2>Convites <em>extras</em></h2><div class="faixa alerta"><div>${MSG_SEM_COMPRA}</div></div>
+      <div class="acoes"><button class="botao fantasma" data-fechar-folha>Fechar</button></div>`);
+  }
   abrirFolha('<div class="vazio">Carregando…</div>');
   let oferta;
   try { oferta = await chamar('/convites'); }
@@ -4873,7 +4895,8 @@ async function entrar() {
     chamar('/config').then((c) => { estado.config = c; }).catch(() => {}),
   ]);
   estado.eu = eu;
-  if (estado.eu.situacao === 'cancelada') return telaCancelada();
+  // A7 (13/11/2026): a cancelada entra no portal como as outras; a tela "Sua adesão foi cancelada" ficou só
+  // para o protótipo antigo, que ainda responde 409 no financeiro.
   await irPara('inicio');
   renovarAvisos();
   // Veio pelo toque na notificação: abre o pedido por cima do início.
