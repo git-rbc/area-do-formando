@@ -2378,6 +2378,9 @@ function formularioAjuda(motivo, erro, ctx = {}, estadoForm = null) {
       if (faltando) return formularioAjuda(motivo, `Preencha: ${faltando.rotulo.toLowerCase()}.`, ctx, f);
       if (textoObrig && f.texto.length < 10) return formularioAjuda(motivo, 'Conte um pouco mais (pelo menos uma frase) para a equipe poder ajudar.', ctx, f);
       if (motivo.anexo === 'obrigatorio' && !f.anexos.length) return formularioAjuda(motivo, `Anexe ${(motivo.anexoRotulo || 'o arquivo').toLowerCase()}.`, ctx, f);
+      if (motivo.id === 'outro' && !f.naoEhCancelamento && !adesaoCancelada() && falaEmCancelar(f.texto)) {
+        return perguntarSeEhCancelamento(motivo, ctx, f);
+      }
 
       e.target.disabled = true; e.target.textContent = 'Enviando…';
       try {
@@ -2436,6 +2439,33 @@ const MOTIVOS_CANCELAMENTO = [
   'Divergências com a turma',
   'Outros',
 ];
+
+// A11 (16/11/2026): "Cancelar contrato." escrito em Outro assunto caía na fila errada e não valia como
+// aviso de cancelamento. A palavra sozinha não diz o que é (contrato, fatura, ingresso, convite), então
+// quem decide é o formando: se for a adesão, vai para o caminho do cancelamento; se não, envia como estava.
+const falaEmCancelar = (texto) => /\b(cancel|desist)/.test(String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase());
+
+function perguntarSeEhCancelamento(motivo, ctx, f) {
+  abrirFolha(`
+    <h2>Você quer cancelar a sua <em>adesão</em>?</h2>
+    <div class="sub">Vimos que o seu pedido fala em cancelar. Se for sair da formatura, o pedido tem um
+      caminho próprio: ele mostra as condições, registra o seu aviso por escrito e vai direto para a equipe
+      de cancelamentos.</div>
+    <div class="acoes" style="flex-direction:column;gap:10px">
+      <button class="botao" id="eh-cancelamento">Sim, quero cancelar a minha adesão</button>
+      <button class="botao secundario" id="nao-eh-cancelamento">Não, é outra coisa — enviar o pedido</button>
+      <button class="botao fantasma" id="editar-pedido">Voltar e editar</button>
+    </div>
+  `, (el) => {
+    el.querySelector('#eh-cancelamento').addEventListener('click', telaCancelamentoAviso);
+    el.querySelector('#editar-pedido').addEventListener('click', () => formularioAjuda(motivo, null, ctx, f));
+    el.querySelector('#nao-eh-cancelamento').addEventListener('click', () => {
+      f.naoEhCancelamento = true;
+      formularioAjuda(motivo, null, ctx, f);
+      setTimeout(() => document.querySelector('#enviar-ajuda')?.click(), 0);
+    });
+  });
+}
 
 async function telaCancelamentoAviso() {
   abrirFolha('<div class="vazio">Carregando…</div>');
