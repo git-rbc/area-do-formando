@@ -1894,6 +1894,17 @@ async function api(req, res, url) {
     return responder(res, 200, { naoLidas: notificacoes(adesao).naoLidas });
   }
 
+  // "Para assinar" (D3, 16/11/2026). No protótipo, um aditivo de convite de
+  // exemplo, para ver o bloco no início.
+  if (metodo === 'GET' && rota === '/para-assinar') {
+    const adesao = exigirFormando(req, res); if (!adesao) return;
+    return responder(res, 200, [{
+      tipo: 'aditivo_convite', id: 'exemplo', titulo: 'Aditivo dos convites extras',
+      descricao: '2 convites para Festa de 50% do curso. Os convites só valem depois da assinatura.',
+      url: 'https://exemplo.invalido/s/abc', desde: '2026-11-14T12:00:00Z',
+    }]);
+  }
+
   // Termo de adesão e contrato coletivo em PDF. No ambiente real, link assinado
   // de curta duração para o arquivo do DocuSeal.
   if (metodo === 'GET' && rota === '/contrato/termo/pdf') {

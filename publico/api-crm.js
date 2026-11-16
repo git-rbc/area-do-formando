@@ -664,6 +664,9 @@
       return pedir('GET', lib ? ('/convites?liberacao=' + encodeURIComponent(lib)) : '/convites', null, token);
     }
     if (caminho === '/convites/historico' && metodo === 'GET') return pedir('GET', '/convites/historico', null, token);
+    // "Para assinar" no início (D3, 16/11/2026): aditivos de convite e de
+    // cancelamento pendentes, cada um com o link do DocuSeal.
+    if (caminho === '/para-assinar' && metodo === 'GET') return pedir('GET', '/para-assinar', null, token);
     if (caminho === '/convites/simular' && metodo === 'POST') {
       return pedir('POST', '/convites/simular', { ...(corpo || {}), liberacao: liberacao() }, token);
     }

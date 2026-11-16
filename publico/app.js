@@ -820,6 +820,7 @@ function abaInicio() {
   moldura(`
     ${faixaAdesaoCancelada()}
     ${painelAtencao()}
+    <div id="para-assinar"></div>
 
     <div class="frase">
       <div class="simbolo">
@@ -862,6 +863,35 @@ function abaInicio() {
   ligarBoletos();
   ligarPainelAtencao();
   app.querySelectorAll('[data-ir]').forEach((b) => b.addEventListener('click', () => irPara(b.dataset.ir)));
+  carregarParaAssinar();
+}
+
+/**
+ * "PARA ASSINAR" (D3, 16/11/2026). Tudo o que falta assinar num lugar só, no
+ * topo do início: o aditivo dos convites extras e o aditivo de cancelamento,
+ * cada um com o botão que abre o documento. Vem depois do resto da tela,
+ * porque o link do cancelamento é buscado no DocuSeal; se a busca falhar, o
+ * bloco simplesmente não aparece.
+ */
+async function carregarParaAssinar() {
+  const lugar = app.querySelector('#para-assinar');
+  if (!lugar) return;
+  let docs = [];
+  try { docs = (await chamar('/para-assinar')) || []; } catch { return; }
+  if (!Array.isArray(docs) || !docs.length || !app.contains(lugar)) return;
+  lugar.innerHTML = `
+    <div class="cartao para-assinar">
+      <div class="kicker">Para assinar</div>
+      <p style="margin:4px 0 10px;color:var(--texto-suave)">${docs.length === 1 ? 'Falta 1 documento' : `Faltam ${docs.length} documentos`} com a sua assinatura.</p>
+      ${docs.map((d) => `
+        <div class="para-assinar-item">
+          <div>
+            <b>${escapar(d.titulo)}</b>
+            <span class="convite-sub">${escapar(d.descricao || '')}${d.desde ? ` · desde ${dataCurta(String(d.desde).slice(0, 10))}` : ''}</span>
+          </div>
+          <a class="botao" href="${escapar(d.url)}" target="_blank" rel="noopener">Assinar</a>
+        </div>`).join('')}
+    </div>`;
 }
 
 // ---------- aba: financeiro --------------------------------------------------
@@ -1883,7 +1913,7 @@ const MOTIVOS_DE_AJUDA = [
     campos: [
       { id: 'etapa', tipo: 'etapa', rotulo: 'Para qual evento' },
       { id: 'dataCompra', tipo: 'data', rotulo: 'Data da compra', obrigatorio: true },
-      { id: 'forma', tipo: 'chips', rotulo: 'Como pagou', opcoes: ['Pix', 'Cartão', 'Boleto'], obrigatorio: true },
+      { id: 'forma', tipo: 'chips', rotulo: 'Como pagou', opcoes: ['Pix', 'Cartão'], obrigatorio: true },
     ],
     anexo: 'obrigatorio', anexoRotulo: 'Comprovante do pagamento', texto: 'opcional',
   },
@@ -3724,26 +3754,6 @@ function abaContrato() {
         Sem venda de convite agora: ${c.festasEncerradas.map((f) => `<b>${escapar(f.rotulo)}</b> (${escapar(f.motivo || 'indisponível')})`).join(' · ')}
       </p>` : ''}
 
-    ${(() => {
-      // Aqui só cabem os pedidos que mexem no contrato; o resto mora em Meus pedidos.
-      const doContrato = (c.solicitacoes || []).filter((s) => ['convites_extras', 'antecipacao', 'quitacao'].includes(s.tipo));
-      if (!doContrato.length) return '';
-      return `
-        <div class="secao-titulo">Seus pedidos de convite</div>
-        <div class="lista">
-          ${doContrato.map((s) => `
-            <div class="item inerte">
-              <div class="quando">
-                <strong>${escapar(s.rotulo || 'Pedido para a equipe')}</strong>
-                <span>${escapar(s.payload.mensagem || '')}</span>
-                <br><span class="protocolo">${escapar(s.protocolo || '')}</span>
-                <span class="marca-status s-em_aberto">${STATUS_PEDIDO[s.status] || escapar(s.status)}</span>
-              </div>
-            </div>`).join('')}
-        </div>
-        <p class="rodape-nota">Pedidos de convite não viram cobrança sozinhos: a equipe confere e faz o aditivo com você.</p>`;
-    })()}
-
     ${notaRodape()}
 
     <div class="pe-discreto">
@@ -4175,6 +4185,26 @@ async function telaConvites() {
             não tem evento cadastrado: não há o que vender e nem data para
             esperar. Com festa e sem preço, a festa existe e o que falta é o
             preço do convite — aí vale pedir para a equipe. */ ''}
+      ${/* VENDA FECHADA: PEDIR À EQUIPE (A2b, 16/11/2026). Dentro dos 7 dias
+            a compra sai do portal, mas o pedido não morre: o botão abre o
+            chamado "Quero convites extras" já com a festa, e a equipe responde
+            com o link de compra depois do prazo. */ ''}
+      ${(() => {
+        const fechadas = disponiveis.filter((f) => !f.podeComprar && f.formas && f.formas.equipe);
+        if (!fechadas.length) return '';
+        return `
+        <div class="secao-titulo">Venda encerrada no portal</div>
+        ${fechadas.map((f) => `
+          <div class="convite-item">
+            <div class="convite-cab"><div>
+              <b>${escapar(f.rotulo)}</b>
+              <span class="convite-sub">${f.data ? `festa em ${dataCurta(f.data)}` : ''}</span>
+            </div></div>
+            <p class="rodape-nota" style="margin:6px 0 8px">A compra pelo portal fecha 7 dias antes da festa. Ainda precisa de convite? Peça à equipe: se houver lugar, ela manda o link para você comprar.</p>
+            <button type="button" class="botao secundario" data-pedir-equipe="${escapar(f.chave)}">Pedir à equipe</button>
+          </div>`).join('')}`;
+      })()}
+
       ${!oferta.festas.length
         ? `<div class="vazio">As festas da sua turma ainda não foram cadastradas.<br>
              Quando a equipe marcar onde e quando cada festa acontece, os convites extras aparecem aqui.</div>`
@@ -4313,6 +4343,17 @@ async function telaConvites() {
     el.querySelectorAll('[data-remover]').forEach((b) => b.addEventListener('click', () => {
       delete escolhido[b.dataset.remover];
       recalcular();
+    }));
+
+    // A2b: vai direto ao formulário do pedido (sem o "compre no portal", que
+    // aqui não vale mais), com a festa escrita no texto.
+    el.querySelectorAll('[data-pedir-equipe]').forEach((b) => b.addEventListener('click', () => {
+      const festa = oferta.festas.find((x) => x.chave === b.dataset.pedirEquipe);
+      formularioAjuda(motivoPorId('convites_extras'), null, {}, {
+        valores: {},
+        texto: `Quero comprar convites para ${festa ? festa.rotulo : 'a festa'} depois do prazo do portal.`,
+        anexos: [],
+      });
     }));
 
     el.querySelectorAll('#formas [data-forma]').forEach((b) => b.addEventListener('click', (ev) => {
@@ -4536,7 +4577,7 @@ const PERGUNTAS = [
   { p: 'Posso adiantar ou quitar tudo?', r: 'Pode. Em Financeiro, a opção "Antecipar" mostra a soma das próximas parcelas e do contrato inteiro. As parcelas entram pelo valor delas, e a taxa de boleto é cobrada uma vez só em vez de uma por parcela. Escolhida a opção, o boleto único sai na hora.' },
   { p: 'Posso mudar a data de vencimento?', r: 'A reprogramação da forma de pagamento é combinada com a equipe e tem taxa fixa de R$ 75,00 prevista no termo.', c: '17.3' },
   { p: 'O que acontece se eu atrasar?', r: 'Enquanto houver parcela em aberto, a participação em eventos, ensaios e a retirada de convites ficam suspensas até regularizar.', c: '8.1' },
-  { p: 'Como peço convites extras?', r: 'Na aba Contrato, em "Seus convites". O pedido vai para a equipe, que confere disponibilidade e faz o aditivo. Nada é cobrado automaticamente.' },
+  { p: 'Como compro convites extras?', r: 'Aqui no portal, em Contrato e convites: você escolhe a festa e a quantidade e paga na hora, no Pix ou no cartão. Depois chega o aditivo para assinar, e os convites valem a partir da assinatura. A compra fecha 7 dias antes de cada festa; depois disso, peça à equipe.' },
   { p: 'Preciso do comprovante para o imposto de renda', r: 'Em Financeiro, "Informe de pagamentos" soma o que você pagou em cada ano e gera o documento.' },
   { p: 'As datas do cronograma podem mudar?', r: 'Podem: elas são confirmadas pela equipe junto com a comissão da turma. Toda mudança aparece no cronograma e nos avisos.' },
 ];
@@ -5240,7 +5281,9 @@ async function telaEventoPublico(token) {
           ${evento.convidadoDe
             ? `Este link foi compartilhado por <b>${escapar(evento.convidadoDe)}</b> e vale por mais
                ${escapar(horasLegiveis(evento.horasRestantes))}. O convite que você comprar fica no nome que você
-               informar, como convidado de ${escapar(evento.convidadoDe)} — não é preciso CPF.`
+               informar, como convidado de ${escapar(evento.convidadoDe)} — não é preciso CPF.
+               <span class="faixa info" style="display:block;margin-top:10px"><b>Estes convites entram no contrato de ${escapar(evento.convidadoDe)}.</b>
+               Assim que o pagamento confirmar, ${escapar(evento.convidadoDe)} recebe um e-mail com a compra e assina o aditivo.</span>`
             : evento.podeComprar === false
               ? `As compras para esta festa se encerraram${evento.compraAte ? ` em ${escapar(dataDoInstante(evento.compraAte))}` : ''}.
                  Entre com o seu CPF para ver os ingressos que já comprou e apresentá-los na entrada.`
@@ -5561,6 +5604,26 @@ async function entrarComToken(acesso, tokenDoEvento, evento) {
  * fora daquele contrato. Então o botão de comprar não aparece — botão que
  * termina em recusa é pior do que botão nenhum.
  */
+/** B9 (16/11/2026): quem é da turma nomeia no portal, não no link. */
+function telaNomearNoPortal() {
+  app.className = 'entrar';
+  const portal = location.origin + location.pathname;
+  app.innerHTML = `
+    <div class="entrar-caixa">
+      ${marca()}
+      <div class="cartao">
+        <div class="kicker">${escapar(compraEvento.evento?.nome || '')}</div>
+        <h1>Os nomes ficam na <span class="grifo">Área do Formando</span></h1>
+        <p class="sub">Para dizer quem usa cada convite, entre na Área do Formando com o seu CPF e abra
+          <b>Contrato e convites</b> › <b>Dizer quem vai usar</b>. Lá você vê todos os seus convites, de todas as festas.</p>
+        <a class="botao" href="${escapar(portal)}" style="margin-top:14px;display:block;text-align:center;text-decoration:none">Abrir a Área do Formando</a>
+        <button class="botao secundario" id="voltar-nomear-portal" style="margin-top:10px">Voltar</button>
+      </div>
+      ${notaRodape()}
+    </div>`;
+  app.querySelector('#voltar-nomear-portal').addEventListener('click', () => telaEscolherAcao());
+}
+
 function trazOConviteQueJaTem() {
   return compraEvento.participacaoAvulsa?.usaConviteDaAdesao === true;
 }
@@ -5923,6 +5986,14 @@ function telaComprarAvulso(erro) {
           ` : ''}
         </div>
 
+        ${/* "LI E ACEITO" (B7, 16/11/2026): esta compra não tem aditivo, então
+              as regras são aceitas aqui. O servidor recusa sem o aceite. */''}
+        <label class="aceite-avulso" style="display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-size:14px">
+          <input type="checkbox" id="aceite-avulso" ${estadoCompra.aceite ? 'checked' : ''} style="margin-top:3px" />
+          <span>Li e aceito: o convite pago <b>não tem devolução</b>, e os nomes de quem usa podem ser trocados
+            até <b>15 dias antes da festa</b>. Depois disso, só com a equipe.</span>
+        </label>
+
         <button class="botao" id="pagar-avulso" style="margin-top:14px">
           ${estadoCompra.forma === 'pix' ? 'Gerar o Pix' : 'Abrir o pagamento no cartão'}
         </button>
@@ -5970,8 +6041,10 @@ function telaComprarAvulso(erro) {
   });
 
   app.querySelector('#voltar-avulso').addEventListener('click', () => voltarDaNomeacao());
+  app.querySelector('#aceite-avulso').addEventListener('change', (ev) => { estadoCompra.aceite = ev.target.checked; });
 
   app.querySelector('#pagar-avulso').addEventListener('click', async () => {
+    if (!estadoCompra.aceite) return telaComprarAvulso('Para comprar, marque que leu e aceita as regras do convite.');
     const botao = app.querySelector('#pagar-avulso');
     botao.disabled = true;
     botao.textContent = 'Abrindo…';
@@ -5979,7 +6052,7 @@ function telaComprarAvulso(erro) {
       estadoCompra.qtd = lerQtd();
       const cobranca = await pedirComAcesso(`/${encodeURIComponent(compraEvento.token)}/avulso/comprar`, {
         method: 'POST',
-        body: JSON.stringify({ quantidade: estadoCompra.qtd, forma: estadoCompra.forma, parcelas: estadoCompra.parcelas }),
+        body: JSON.stringify({ quantidade: estadoCompra.qtd, forma: estadoCompra.forma, parcelas: estadoCompra.parcelas, aceite: true }),
       });
       telaPagarAvulso(cobranca);
     } catch (err) {
@@ -6154,7 +6227,7 @@ function telaComprarIngresso(erro) {
 
         <p class="rodape-nota" style="margin-top:10px">
           ${compraEvento.comoConvidado
-            ? `Você está comprando um convite de <b>${escapar(compraEvento.convidadoDe || '')}</b>.`
+            ? `<b>Estes convites entram no contrato de ${escapar(compraEvento.convidadoDe || '')}.</b> Assim que o pagamento confirmar, ${escapar(compraEvento.convidadoDe || '')} recebe um e-mail com a compra e assina o aditivo.`
             : 'No Pix você paga o valor dos convites, sem acréscimo. No cartão, a operadora cobra taxa e juros, que aparecem antes de você confirmar.'}
         </p>
       </div>
@@ -6215,6 +6288,12 @@ function voltarDaNomeacao() {
 function telaNomearConvites(erro) {
   const f = compraEvento.meusConvites;
   if (!f) return telaComprarIngresso();
+  // A NOMEAÇÃO É NO PORTAL (B9, 16/11/2026). O formando da turma diz quem usa
+  // cada convite na Área do Formando, em "Contrato e convites"; o link fica só
+  // para comprar depois do prazo. Fica aqui só quem entrou nesta festa vindo
+  // de outra turma: o convite dele é deste evento e não aparece no portal da
+  // turma dele.
+  if (!compraEvento.participacaoAvulsa) return telaNomearNoPortal();
 
   const quantos = f.convites;
   const atuais = (f.nomes || []).map((n) => ({ nome: n.nome ?? '', documento: n.documento ?? '' }));
