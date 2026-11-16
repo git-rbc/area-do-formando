@@ -2640,6 +2640,9 @@ async function telaPedido(id, erro, rascunho = null) {
   const quando = s.resolvidoEm || s.criadoEm;
   const podeReabrir = encerrado && s.status !== 'cancelada' && Date.now() - new Date(quando).getTime() < DIAS_PARA_REABRIR * 86400000;
   const podeResponder = !encerrado || podeReabrir;
+  // A9 (13/11/2026): o formando cancela o próprio pedido aberto. O pedido de cancelamento da adesão
+  // não tem o botão — desistir dele é conversa com a equipe.
+  const podeDesistir = !encerrado && s.tipo !== 'cancelamento';
   const campos = s.payload?.campos || [];
 
   const bolha = (m, i) => `
@@ -2677,12 +2680,18 @@ async function telaPedido(id, erro, rascunho = null) {
         <div class="acoes"><button class="botao" id="enviar-resposta">${encerrado ? 'Reabrir e enviar' : 'Enviar resposta'}</button></div>
       </div>` : encerrado ? '<p class="rodape-nota">Precisa de ajuda com outra coisa? Abra um novo pedido.</p>' : ''}
 
+    ${podeDesistir ? `
+      <div class="desistir-pedido" id="desistir-caixa">
+        <button class="botao fantasma" id="desistir">Não preciso mais deste pedido</button>
+      </div>` : ''}
+
     <div class="acoes"><button class="botao fantasma" id="voltar-pedidos">Voltar para Meus pedidos</button></div>
   `, (el) => {
     el.querySelector('#voltar-pedidos').addEventListener('click', telaMeusPedidos);
     el.querySelectorAll('[data-anexo]').forEach((b) => b.addEventListener('click', () => abrirAnexoDoPedido(s.id, b.dataset.anexo)));
     const conversa = el.querySelector('.conversa');
     conversa?.lastElementChild?.scrollIntoView({ block: 'nearest' });
+    if (podeDesistir) ligarDesistencia(el, s);
     if (!podeResponder) return;
     el.querySelector('#resposta-texto').addEventListener('input', (e) => { f.texto = e.target.value; });
     ligarAnexos(el, f.anexos);
@@ -2701,6 +2710,31 @@ async function telaPedido(id, erro, rascunho = null) {
       } catch (err) {
         const mensagens = { pedido_encerrado: 'Este pedido já foi encerrado. Abra um novo pedido.', arquivo_grande: 'Algum arquivo passa de 8 MB.', tipo_nao_aceito: 'Algum arquivo não é foto nem PDF.' };
         telaPedido(id, mensagens[err.message] || 'Não foi possível enviar agora. Tente de novo.', f);
+      }
+    });
+  });
+}
+
+// "Não preciso mais": pede confirmação na própria tela (sem janela do navegador) e cancela.
+function ligarDesistencia(el, s) {
+  const caixa = el.querySelector('#desistir-caixa');
+  el.querySelector('#desistir').addEventListener('click', () => {
+    caixa.innerHTML = `
+      <div class="faixa alerta"><div><b>Cancelar o pedido ${escapar(s.protocolo)}?</b>
+        Ele sai da fila da equipe e não pode ser reaberto. Se precisar de novo, é só abrir outro pedido.</div></div>
+      <div class="acoes dupla">
+        <button class="botao" id="desistir-sim">Sim, cancelar</button>
+        <button class="botao fantasma" id="desistir-nao">Voltar</button>
+      </div>`;
+    caixa.querySelector('#desistir-nao').addEventListener('click', () => telaPedido(s.id));
+    caixa.querySelector('#desistir-sim').addEventListener('click', async (e) => {
+      e.target.disabled = true; e.target.textContent = 'Cancelando…';
+      try {
+        await chamar(`/solicitacoes/${s.id}/cancelar`, { method: 'POST', body: '{}' });
+        avisar('Pedido cancelado');
+        telaPedido(s.id);
+      } catch (err) {
+        telaPedido(s.id, err.message === 'pedido_encerrado' ? 'Este pedido já foi encerrado.' : 'Não foi possível cancelar agora. Tente de novo.');
       }
     });
   });

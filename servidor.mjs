@@ -1790,6 +1790,20 @@ async function api(req, res, url) {
     return responder(res, 201, pedidoParaOFormando(s, { comMensagens: true }));
   }
 
+  // A9 (13/11/2026): "Não preciso mais" — o formando cancela o próprio pedido aberto.
+  const mCancelar = rota.match(/^\/solicitacoes\/([\w-]+)\/cancelar$/);
+  if (metodo === 'POST' && mCancelar) {
+    const adesao = exigirFormando(req, res); if (!adesao) return;
+    const s = solicitacoes.find((x) => x.id === mCancelar[1] && x.adesaoId === adesao.adesaoId);
+    if (!s) return responder(res, 404, { erro: 'nao_encontrado' });
+    if (s.tipo === 'cancelamento') return responder(res, 409, { erro: 'cancelamento_da_adesao' });
+    if (!['aberta', 'pendente', 'em_atendimento', 'aguardando_formando'].includes(s.status)) return responder(res, 409, { erro: 'pedido_encerrado' });
+    s.status = 'cancelada'; s.resolvidoEm = new Date().toISOString();
+    novoRegistro(s, 'status', 'O formando cancelou o pedido pelo portal ("Não preciso mais").');
+    console.log(`  [${s.protocolo}] ${adesao.nome} cancelou o pedido`);
+    return responder(res, 200, pedidoParaOFormando(s, { comMensagens: true }));
+  }
+
   // Ver um anexo da conversa (do formando ou da equipe).
   const mAnexo = rota.match(/^\/solicitacoes\/([\w-]+)\/anexos\/([\w-]+)$/);
   if (metodo === 'GET' && mAnexo) {

@@ -554,6 +554,15 @@
         throw err;
       }
     }
+    // A9: "Não preciso mais" (o formando cancela o próprio pedido aberto).
+    if (/^\/solicitacoes\/[\w-]+\/cancelar$/.test(caminho) && metodo === 'POST') {
+      try {
+        return await pedir('POST', caminho, {}, token);
+      } catch (err) {
+        if (err.status === 409) throw new Error('pedido_encerrado');
+        throw err;
+      }
+    }
     if (/^\/solicitacoes\/[\w-]+(\/anexos\/[\w-]+)?$/.test(caminho)) return pedir('GET', caminho, null, token);
     // Aviso no celular (mig 1247): mesmo caminho e corpo dos dois lados.
     if (caminho.startsWith('/push/')) return pedir(metodo, caminho, corpo, token);

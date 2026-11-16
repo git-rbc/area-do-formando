@@ -1507,6 +1507,8 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
 .conversa-nota { align-self: center; font-size: 12.5px; color: var(--texto-suave); text-align: center; padding: 4px 10px; }
 .responder-pedido { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--linha); }
 .responder-pedido .dica { margin-bottom: 10px; font-size: 13px; color: var(--texto-suave); }
+.desistir-pedido { margin-top: 14px; text-align: center; }
+.desistir-pedido > .botao.fantasma { color: var(--texto-suave); font-size: 13px; }
 
 /* Aviso no celular (12/11/2026): texto em cima, botão embaixo, à esquerda. */
 .faixa.avisos { flex-direction: column; gap: 10px; }
