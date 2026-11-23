@@ -1521,3 +1521,9 @@ button, .item, summary { -webkit-tap-highlight-color: rgba(123, 78, 194, .15); }
 .para-assinar-item b { display: block; }
 .para-assinar-item .botao { flex: none; text-decoration: none; }
 @media (max-width: 520px) { .para-assinar-item { flex-direction: column; align-items: stretch; } }
+
+/* Respostas do caminho do cancelamento (19/11/2026). */
+.texto-resposta p { margin: 0 0 10px; line-height: 1.55; }
+.texto-resposta { margin: 8px 0 14px; }
+.desistir-pedido { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.desistir-pedido > .faixa, .desistir-pedido > .acoes { flex-basis: 100%; }

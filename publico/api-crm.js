@@ -78,6 +78,8 @@
       if (envelope.data && envelope.data.codigo) {
         erro.codigo = envelope.data.codigo;
         erro.falta = envelope.data.falta || [];
+        // A10 (19/11/2026): o 409 do "um pedido por vez" traz o pedido aberto.
+        erro.dados = envelope.data;
       }
       throw erro;
     }
@@ -141,6 +143,10 @@
       const erro = new Error(envelope.message || 'falha');
       erro.status = r.status;
       if (envelope.message) erro.detalhe = envelope.message;
+      if (envelope.data && envelope.data.codigo) {
+        erro.codigo = envelope.data.codigo;
+        erro.dados = envelope.data;
+      }
       throw erro;
     }
     return envelope.data ?? {};
@@ -525,6 +531,23 @@
     // ── pedidos (viram demanda no CRM) ───────────────────────────────────────
     // Multas do contrato e a faixa de hoje, antes do pedido de cancelamento.
     if (caminho === '/cancelamento/condicoes') return pedir('GET', caminho, null, token);
+    // R3c (19/11/2026): a multa em reais, só depois de ele escolher "Quero cancelar".
+    if (caminho === '/cancelamento/conta') return pedir('GET', caminho, null, token);
+    // A10: o pedido aberto do formando (um pedido por vez).
+    if (caminho === '/solicitacoes/aberto') return pedir('GET', caminho, null, token);
+    // A11: mudar o assunto do pedido aberto (pode ir com anexo, como a abertura).
+    if (/^\/solicitacoes\/[\w-]+\/assunto$/.test(caminho) && metodo === 'POST') {
+      try {
+        return await enviarComAnexos(caminho, corpo || {}, token);
+      } catch (err) {
+        if (err.status === 409 && !err.codigo && !err.detalhe) throw new Error('pedido_encerrado');
+        throw err;
+      }
+    }
+    // A12 ("já foi resolvido") e D11 (dados bancários da devolução).
+    if (/^\/solicitacoes\/[\w-]+\/(concluir|dados-bancarios)$/.test(caminho) && metodo === 'POST') {
+      return pedir('POST', caminho, corpo || {}, token);
+    }
 
     if (caminho === '/solicitacoes' && metodo === 'POST') {
       try {

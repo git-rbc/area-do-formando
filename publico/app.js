@@ -523,12 +523,14 @@ const CLAUSULAS = {
   // Cláusulas Sexta e Sétima do Termo de Adesão (adesao-contrato.template.ts), para a tela do pedido de cancelamento.
   '6.1': 'A desistência dependerá de comunicação formal por escrito (e-mail ou WhatsApp) à CONTRATADA. O simples abandono do contrato, a ausência aos eventos, a interrupção dos pagamentos ou qualquer forma de silêncio não será considerada desistência válida, mantendo-se a vigência das obrigações contratuais assumidas.',
   '6.2': 'Comunicada a desistência, incidirá cláusula penal, a título de pena convencional (art. 416, caput, do Código Civil), calculada sobre o valor total da adesão conforme a antecedência da comunicação em relação à festa de formatura.',
+  '6.4': 'Comunicada a desistência a 30 (trinta) dias ou menos da festa, ou após a confirmação definitiva do número de convidados, o preço torna-se integralmente exigível, deduzidos apenas os custos comprovadamente evitados pela CONTRATADA.',
   '6.5': 'Após o cálculo da pena, a CONTRATADA realizará o encontro de contas com os valores já pagos pelo CONTRATANTE: se houver pago mais do que o devido, a diferença lhe será restituída em até 30 (trinta) dias úteis da formalização da desistência; se houver pago menos, complementará a diferença em até 10 (dez) dias úteis da notificação.',
   '7': 'O projeto de formatura compreende entregas escalonadas ao longo de todo o período contratado. Em caso de desistência, os valores correspondentes aos serviços já prestados serão devidos na proporção do serviço executado e não integram a base de restituição.',
   '8.1': 'O CONTRATANTE que estiver inadimplente com quaisquer parcelas do contrato terá seus direitos suspensos, ficando impedido de participar de eventos, ensaios e cerimônias (incluindo festa de meio de curso, foto-convite, pré-eventos e formatura), bem como de retirar convites ou benefícios, até a regularização total do débito.',
   '8.2': 'A inscrição do CONTRATANTE em cadastro de proteção ao crédito será precedida de notificação por escrito, com prazo de 15 (quinze) dias para regularização.',
   '8.3': 'A parte que der causa à cobrança extrajudicial de valores devidos por força deste contrato arcará com honorários de cobrança de 10% (dez por cento) sobre o valor exigido, obrigação que se aplica reciprocamente a ambas as partes.',
   '17.1': 'Este contrato poderá ser rescindido: (a) por acordo entre as partes; (b) por inadimplência superior a 90 (noventa) dias; ou (c) por descumprimento comprovado de suas cláusulas.',
+  '18.1': 'Este Termo tem natureza individual e vincula-se ao Contrato Coletivo firmado entre a CONTRATADA e a Comissão de Formatura, cujas disposições o complementam e integram. Havendo divergência entre os instrumentos, prevalece este Termo nas matérias relativas à relação individual do CONTRATANTE.',
   '17.3': 'Toda reprogramação da forma de pagamento acordada gera uma taxa de alteração fixa no valor de R$ 75,00 (setenta e cinco reais).',
 };
 
@@ -2009,11 +2011,17 @@ const motivoPorId = (id) => MOTIVOS_DE_AJUDA.find((m) => m.id === id);
 document.addEventListener('click', (e) => { if (e.target.closest?.('#duvida-data')) telaTemaDeAjuda('eventos'); });
 
 // --- telas --------------------------------------------------------------------
-async function telaAjuda() {
+async function telaAjuda(ctx = {}) {
+  const mudando = ctx.mudarDe;
   abrirFolha(`
-    <h2>Preciso de <em>ajuda</em></h2>
+    ${mudando
+      ? `<div class="olho-ajuda">Mudar de assunto · ${escapar(mudando.protocolo)}</div>
+    <h2>Qual é o <em>novo assunto</em>?</h2>
+    <div class="sub">O pedido ${escapar(mudando.protocolo)} (${escapar(mudando.assunto)}) continua o mesmo, com a conversa junto: só o assunto muda.</div>`
+      : `<h2>Preciso de <em>ajuda</em></h2>
     <div class="sub">Escolha o assunto. Muita coisa você resolve na hora; o que precisar da equipe vira um
     pedido com número de protocolo, e a conversa continua em <b>Meus pedidos</b>.</div>
+    <div data-pedido-aberto></div>`}
 
     <div class="lista-antecipa">
       ${TEMAS_DE_AJUDA.map((t) => `
@@ -2023,9 +2031,24 @@ async function telaAjuda() {
         </button>`).join('')}
     </div>
 
-    <div class="acoes"><button class="botao fantasma" data-fechar-folha>Fechar</button></div>
+    ${mudando ? '<div class="ainda-preciso"><span>Quer sair da formatura?</span><button class="link-inline" id="mudar-para-cancelamento">Cancelar a minha adesão</button></div>' : ''}
+    <div class="acoes"><button class="botao fantasma" ${mudando ? 'id="voltar-ao-pedido"' : 'data-fechar-folha'}>${mudando ? 'Voltar ao pedido' : 'Fechar'}</button></div>
   `, (el) => {
-    el.querySelectorAll('[data-tema]').forEach((b) => b.addEventListener('click', () => telaTemaDeAjuda(b.dataset.tema)));
+    el.querySelectorAll('[data-tema]').forEach((b) => b.addEventListener('click', () => telaTemaDeAjuda(b.dataset.tema, ctx)));
+    el.querySelector('#voltar-ao-pedido')?.addEventListener('click', () => telaPedido(mudando.id));
+    el.querySelector('#mudar-para-cancelamento')?.addEventListener('click', () => telaCancelamentoAviso(mudando));
+    // A10 (19/11/2026): um pedido aberto por vez — avisa antes de ele preencher tudo.
+    const lugar = el.querySelector('[data-pedido-aberto]');
+    if (lugar) {
+      chamar('/solicitacoes/aberto').then((r) => {
+        const p = r.pedidoAberto;
+        if (!p || !lugar.isConnected) return;
+        lugar.innerHTML = `<div class="faixa" style="margin-bottom:12px"><div>Você tem o pedido <b>${escapar(p.protocolo)}</b> (${escapar(p.assunto)}) aberto.
+          Cada formando tem um pedido por vez: para outro assunto, use <b>Mudar de assunto</b> nele.
+          <button class="link-inline" id="abrir-pedido-aberto">Abrir o pedido</button></div></div>`;
+        lugar.querySelector('#abrir-pedido-aberto').addEventListener('click', () => telaPedido(p.id));
+      }).catch(() => {});
+    }
   });
   garantirDadosDaAjuda();
 }
@@ -2047,7 +2070,7 @@ function telaTemaDeAjuda(temaId, ctx = {}) {
     </div>
     <div class="acoes"><button class="botao secundario" id="voltar-ajuda">Voltar</button></div>
   `, (el) => {
-    el.querySelector('#voltar-ajuda').addEventListener('click', telaAjuda);
+    el.querySelector('#voltar-ajuda').addEventListener('click', () => telaAjuda(ctx));
     el.querySelectorAll('[data-motivo]').forEach((b) => b.addEventListener('click', () => abrirMotivo(motivoPorId(b.dataset.motivo), ctx)));
   });
 }
@@ -2394,7 +2417,7 @@ function formularioAjuda(motivo, erro, ctx = {}, estadoForm = null) {
     el.querySelector('#voltar-ajuda').addEventListener('click', () => {
       if (ctx.voltar) return ctx.voltar();
       if (motivo.fora) return fecharFolha();
-      return motivo.resolver ? abrirMotivo(motivo, ctx) : telaTemaDeAjuda(motivo.tema);
+      return motivo.resolver ? abrirMotivo(motivo, ctx) : telaTemaDeAjuda(motivo.tema, ctx);
     });
 
     el.querySelector('#enviar-ajuda').addEventListener('click', async (e) => {
@@ -2416,7 +2439,9 @@ function formularioAjuda(motivo, erro, ctx = {}, estadoForm = null) {
       try {
         const campos = visiveis.map((c) => ({ rotulo: c.rotulo, valor: valorLegivel(c, f.valores[c.id]) })).filter((c) => c.valor);
         const billId = visiveis.some((c) => c.tipo === 'parcela') ? f.valores.parcela || null : null;
-        const r = await chamar('/solicitacoes', {
+        // A11: vindo de "Mudar de assunto", o mesmo pedido troca de assunto em vez de nascer outro.
+        const caminho = ctx.mudarDe ? `/solicitacoes/${ctx.mudarDe.id}/assunto` : '/solicitacoes';
+        const r = await chamar(caminho, {
           method: 'POST',
           body: JSON.stringify({
             tipo: motivo.tipo,
@@ -2434,8 +2459,14 @@ function formularioAjuda(motivo, erro, ctx = {}, estadoForm = null) {
           estado.financeiro = await chamar('/financeiro').catch(() => estado.financeiro);
           if (estado.aba === 'financeiro') abaFinanceiro();
         }
-        folhaPedidoEnviado({ titulo: 'Pedido <em>registrado</em>', sub: escapar(motivo.titulo), protocolo: r.protocolo, pedidoId: r.id });
+        folhaPedidoEnviado({
+          titulo: ctx.mudarDe ? 'Assunto <em>mudado</em>' : 'Pedido <em>registrado</em>',
+          sub: escapar(motivo.titulo),
+          protocolo: r.protocolo,
+          pedidoId: r.id,
+        });
       } catch (err) {
+        if (err.codigo === 'PEDIDO_ABERTO' && err.dados?.pedidoAberto) return folhaPedidoAberto(err.dados.pedidoAberto, motivo, ctx, f);
         const mensagens = {
           tipo_nao_aceito: 'Algum arquivo não é foto nem PDF.',
           arquivo_grande: 'Algum arquivo passa de 8 MB.',
@@ -2448,17 +2479,49 @@ function formularioAjuda(motivo, erro, ctx = {}, estadoForm = null) {
   });
 }
 
+/**
+ * A10 (decisão de 19/11/2026): um pedido aberto por vez. Em vez de abrir outro,
+ * o formando muda o assunto do que já está aberto — ou vai ver o pedido.
+ */
+function folhaPedidoAberto(aberto, motivo, ctx, f) {
+  abrirFolha(`
+    <h2>Você já tem um pedido <em>aberto</em></h2>
+    <div class="sub">Cada formando tem um pedido por vez. O seu pedido <b>${escapar(aberto.protocolo)}</b>
+    (${escapar(aberto.assunto)}) ainda está aberto.</div>
+    <div class="acoes" style="flex-direction:column;gap:10px">
+      ${aberto.tipo === 'cancelamento' ? '' : `<button class="botao" id="mudar-para-este">Mudar o assunto dele para "${escapar(motivo.titulo)}"</button>`}
+      <button class="botao secundario" id="ver-aberto">Ver o pedido aberto</button>
+      <button class="botao fantasma" id="voltar-form">Voltar</button>
+    </div>
+  `, (el) => {
+    el.querySelector('#mudar-para-este')?.addEventListener('click', () => {
+      formularioAjuda(motivo, null, { ...ctx, mudarDe: aberto }, f);
+      setTimeout(() => document.querySelector('#enviar-ajuda')?.click(), 0);
+    });
+    el.querySelector('#ver-aberto').addEventListener('click', () => telaPedido(aberto.id));
+    el.querySelector('#voltar-form').addEventListener('click', () => formularioAjuda(motivo, null, ctx, f));
+  });
+}
+
 // ---------- pedido de cancelamento -------------------------------------------
 // Decisão do dono (05/10/2026): o portal TEM o pedido, mas sem chamar atenção —
 // um link pequeno no fim de "Contrato e convites", fora do menu e fora da lista
 // do "Preciso de ajuda". Quanto mais o formando vê a opção, mais ele pensa nela.
 //
-// O caminho tem duas paradas de propósito:
-//   1. as multas do contrato, com a faixa em que ele está HOJE e a saída para
-//      negociar o pagamento — "li, estou ciente" é o que libera o passo seguinte;
-//   2. o motivo e as observações.
-// O pedido vira demanda no CRM. Ele NÃO cancela nada: é a comunicação por
+// O caminho, na ordem decidida em 19/11/2026 (organograma "Cancelamento de
+// formandos", Fluxo R e textos T0–T14):
+//   T7   ciência — só a quebra do contrato e a multa em %; "quer prosseguir?";
+//   T0   o motivo e uma mensagem complementar OBRIGATÓRIA;
+//   T1–T6 a resposta de cada motivo. Insatisfação vai direto para a equipe; luto
+//        ou doença na mensagem também, sem resposta automática (R2b);
+//   T7c  a multa em REAIS, com os dias e a faixa da 6.2, antes de confirmar;
+//   T8   pedido registrado, com a frase dos 7 dias (T14).
+// Troca de turma e cessão de vaga NUNCA aparecem aqui (decisão de 19/11): só a
+// equipe oferece, na conversa. O pedido NÃO cancela nada: é a comunicação por
 // escrito da cláusula 6.1, e a equipe formaliza o cancelamento num aditivo.
+//
+// Um pedido aberto por vez (A10): se o formando já tem outro pedido aberto, a
+// confirmação MUDA O ASSUNTO dele para cancelamento, em vez de abrir outro.
 
 // Os mesmos motivos do CRM (formatura-cancelamento.regras) — a equipe filtra por eles.
 const MOTIVOS_CANCELAMENTO = [
@@ -2473,7 +2536,22 @@ const MOTIVOS_CANCELAMENTO = [
 // A11 (16/11/2026): "Cancelar contrato." escrito em Outro assunto caía na fila errada e não valia como
 // aviso de cancelamento. A palavra sozinha não diz o que é (contrato, fatura, ingresso, convite), então
 // quem decide é o formando: se for a adesão, vai para o caminho do cancelamento; se não, envia como estava.
-const falaEmCancelar = (texto) => /\b(cancel|desist)/.test(String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase());
+const semAcento = (texto) => String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const falaEmCancelar = (texto) => /\b(cancel|desist)/.test(semAcento(texto));
+
+// R2b: luto ou doença grave. Lista fixa de palavras, sem IA — a mesma do CRM
+// (area-formando-pedido.regras.ts). A conta, nessa hora, soa como cobrança.
+const falaDeLutoOuDoenca = (texto) =>
+  /\b(falec|faleceu|obito|luto|morte|morreu|doenca|doente|cancer|tumor|internad|internacao|uti\b|gravidez de risco|gestacao de risco|quimioterapia|hospital)/.test(semAcento(texto));
+
+// T14 (decisão de 17/11/2026): embaixo de todo pedido.
+const FRASE_SETE_DIAS = 'Acompanhe a sua solicitação por aqui. Se a equipe pedir alguma informação e você não der retorno em até 7 dias, a solicitação será encerrada e arquivada.';
+const FRASE_SETE_DIAS_CANCELAMENTO = 'Com a solicitação arquivada, o cancelamento não acontece: a sua adesão e os boletos continuam valendo.';
+
+const primeiroNome = () => escapar(estado.eu?.primeiroNome || String(estado.eu?.nome || '').split(' ')[0] || '');
+
+/** O que o formando já escolheu no caminho do cancelamento. */
+let caminhoCancelamento = null;
 
 function perguntarSeEhCancelamento(motivo, ctx, f) {
   abrirFolha(`
@@ -2487,7 +2565,7 @@ function perguntarSeEhCancelamento(motivo, ctx, f) {
       <button class="botao fantasma" id="editar-pedido">Voltar e editar</button>
     </div>
   `, (el) => {
-    el.querySelector('#eh-cancelamento').addEventListener('click', telaCancelamentoAviso);
+    el.querySelector('#eh-cancelamento').addEventListener('click', () => telaCancelamentoAviso(ctx.mudarDe || null));
     el.querySelector('#editar-pedido').addEventListener('click', () => formularioAjuda(motivo, null, ctx, f));
     el.querySelector('#nao-eh-cancelamento').addEventListener('click', () => {
       f.naoEhCancelamento = true;
@@ -2497,7 +2575,11 @@ function perguntarSeEhCancelamento(motivo, ctx, f) {
   });
 }
 
-async function telaCancelamentoAviso() {
+/**
+ * A porta do caminho. `mudarDe` = o pedido aberto que vai virar cancelamento
+ * (A11, vindo do "Mudar de assunto"); sem ele, o portal pergunta se há um.
+ */
+async function telaCancelamentoAviso(mudarDe = null) {
   abrirFolha('<div class="vazio">Carregando…</div>');
   let c;
   try { c = await chamar('/cancelamento/condicoes'); }
@@ -2506,11 +2588,28 @@ async function telaCancelamentoAviso() {
   if (c.pedidoAberto) {
     return abrirFolha(`
       <h2>Pedido em <em>análise</em></h2>
-      <div class="sub">Você já pediu o cancelamento em ${dataCurta(String(c.pedidoAberto.criadoEm).slice(0, 10))}. A equipe vai entrar em contato.</div>
+      <div class="sub">Você já pediu o cancelamento em ${dataCurta(String(c.pedidoAberto.criadoEm).slice(0, 10))}. Acompanhe e responda em Meus pedidos.</div>
       <div class="dado"><span>Protocolo</span><b>${escapar(c.pedidoAberto.protocolo)}</b></div>
-      <div class="acoes"><button class="botao" data-fechar-folha>Entendi</button></div>`);
+      <div class="acoes dupla"><button class="botao" data-fechar-folha>Entendi</button><button class="botao secundario" id="ver-pedidos">Meus pedidos</button></div>`,
+    (el) => el.querySelector('#ver-pedidos').addEventListener('click', telaMeusPedidos));
   }
 
+  // A10: outro pedido aberto? A confirmação muda o assunto dele (falha calada: segue sem).
+  const aberto = mudarDe || await chamar('/solicitacoes/aberto').then((r) => r.pedidoAberto || null).catch(() => null);
+  await garantirDadosDaAjuda().catch(() => {});
+  caminhoCancelamento = { condicoes: c, pedidoAberto: aberto && aberto.tipo !== 'cancelamento' ? aberto : null, motivo: '', mensagem: '' };
+  telaCienciaCancelamento();
+}
+
+/** A multa de hoje, como frase: "15% do valor total da adesão" ou "o valor integral da adesão". */
+function multaDeHoje(c) {
+  if (c.faixa?.pct == null) return null;
+  return c.faixa.integral ? 'o valor integral da adesão' : `${c.faixa.pct}% do valor total da adesão`;
+}
+
+// T7 — a ciência: só a quebra do contrato e a multa (decisão de 17/11/2026), em % (19/11).
+function telaCienciaCancelamento() {
+  const c = caminhoCancelamento.condicoes;
   const e = c.escada;
   const faixas = [
     ['Mais de 360 dias antes da festa', `${e.mais360}%`, 'Mais de 360'],
@@ -2520,101 +2619,263 @@ async function telaCancelamentoAviso() {
     ['30 dias ou menos', 'valor integral', '30 dias ou menos'],
   ];
   const atual = (rotulo) => (c.faixa?.rotulo || '').startsWith(rotulo);
-  const hoje = c.faixa?.pct == null
+  const hojeTexto = c.faixa?.pct == null
     ? 'A data da festa ainda não está definida: a equipe confirma a multa com você.'
     : c.faixa.integral
-      ? `Faltam ${c.diasAteFesta} dias para a festa (${dataCurta(c.dataFesta)}). Nessa antecedência, o valor da adesão é devido por inteiro.`
-      : `Faltam ${c.diasAteFesta} dias para a festa (${dataCurta(c.dataFesta)}). A multa prevista é de <b>${c.faixa.pct}% do valor total da adesão</b>.`;
+      ? `Faltam <b>${c.diasAteFesta} dias</b> para a sua festa (${dataCurta(c.dataFesta)}). Pela cláusula 6.4, a esta altura a multa é o <b>valor integral da adesão</b>: cancelar agora não gera devolução nem desconto, e o valor total continua devido.`
+      : `Faltam <b>${c.diasAteFesta} dias</b> para a sua festa (${dataCurta(c.dataFesta)}). Hoje, a sua multa é de <b>${c.faixa.pct}% do valor total da adesão</b>.`;
+  const outro = caminhoCancelamento.pedidoAberto;
 
   abrirFolha(`
-    <h2>Antes de pedir o <em>cancelamento</em></h2>
-    <div class="sub">O cancelamento segue as regras do seu Termo de Adesão. Leia com atenção.</div>
+    <h2>Cancelar é quebrar o <em>contrato</em></h2>
+    <div class="sub">${primeiroNome() ? `${primeiroNome()}, ao` : 'Ao'} pedir o cancelamento você está desistindo do Termo de Adesão que assinou
+    com a Indaiá, antes da formatura. É uma quebra de contrato, e o contrato prevê multa para ela.</div>
 
     <div class="secao-titulo">Multa por desistência ${clausula('6.2')}</div>
+    <div class="sub" style="margin-top:0">A multa é calculada sobre o valor total da sua adesão e depende de quanto falta para a festa:</div>
     <div class="cartao">
       ${faixas.map(([rot, val, chave]) => `
         <div class="dado${atual(chave) ? ' destaque-faixa' : ''}"><span>${rot}</span><b>${val}</b></div>`).join('')}
     </div>
 
-    <div class="faixa info" style="margin-top:14px"><div>${hoje}</div></div>
+    <div class="faixa info" style="margin-top:14px"><div>${hojeTexto}</div></div>
 
-    <div class="secao-titulo">Como funciona</div>
-    <ul class="lista-simples">
-      <li>Este pedido é a sua comunicação por escrito ${clausula('6.1')}. A data dele é a que conta para a multa.</li>
-      <li>Os boletos continuam valendo até o cancelamento ser formalizado num termo aditivo, que a equipe envia para você assinar.</li>
+    <ul class="lista-simples" style="margin-top:14px">
+      <li>O pedido de cancelamento é a sua comunicação por escrito ${clausula('6.1')}: a data em que ele for registrado é a que vale para a multa.</li>
+      <li>Até o cancelamento ser formalizado num termo assinado, o contrato e os boletos continuam valendo.</li>
     </ul>
+    ${outro ? `<div class="faixa" style="margin-top:14px"><div>Você tem o pedido <b>${escapar(outro.protocolo)}</b> (${escapar(outro.assunto)}) aberto. Se seguir, ele passa a ser o seu pedido de cancelamento: cada formando tem um pedido por vez.</div></div>` : ''}
 
-    <div class="faixa" style="margin-top:14px">
-      <div>O motivo é dificuldade para pagar? Dá para combinar uma forma de colocar em dia sem cancelar.
-      <button class="link-inline" id="cancel-negociar">Quero negociar o pagamento</button></div>
-    </div>
-
-    <div class="acoes dupla">
-      <button class="botao" data-fechar-folha>Voltar</button>
-      <button class="botao secundario" id="cancel-ciente">Li, estou ciente e quero dar continuidade na solicitação</button>
+    <div class="sub" style="margin-top:14px"><b>Você quer prosseguir?</b></div>
+    <div class="acoes" style="flex-direction:column;gap:10px">
+      <button class="botao" id="cancel-manter">Não, quero manter a minha formatura</button>
+      <button class="botao secundario" id="cancel-ciente">Li, estou ciente e quero prosseguir</button>
     </div>
   `, (el) => {
-    el.querySelector('#cancel-negociar').addEventListener('click', () =>
-      abrirMotivo(motivoPorId('renegociacao')));
-    el.querySelector('#cancel-ciente').addEventListener('click', () => formularioCancelamento());
+    el.querySelector('#cancel-manter').addEventListener('click', folhaFormaturaMantida);
+    el.querySelector('#cancel-ciente').addEventListener('click', () => telaMotivoCancelamento());
   });
 }
 
-function formularioCancelamento(erro, preenchido = {}) {
+// "Quero manter" antes de existir pedido: nada a encerrar, só a confirmação (T9).
+function folhaFormaturaMantida() {
+  caminhoCancelamento = null;
   abrirFolha(`
-    <h2>Pedido de <em>cancelamento</em></h2>
-    <div class="sub">Conte o motivo. A equipe recebe o pedido com um número de protocolo e entra em contato para
-    conferir os valores com você.</div>
+    <h2>Que bom${primeiroNome() ? `, <em>${primeiroNome()}</em>` : ''}!</h2>
+    <div class="sub">A sua formatura continua exatamente como estava, sem custo nenhum. Nos vemos na festa! 🎓</div>
+    <div class="acoes"><button class="botao" data-fechar-folha>Fechar</button></div>`);
+}
+
+// T0 — o motivo e a mensagem complementar, obrigatória (decisão de 19/11/2026).
+function telaMotivoCancelamento(erro) {
+  const cc = caminhoCancelamento;
+  abrirFolha(`
+    <div class="olho-ajuda">Pedido de cancelamento</div>
+    <h2>Qual é o <em>motivo</em>?</h2>
+    <div class="sub">Sentimos muito que você esteja pensando em sair da formatura${primeiroNome() ? `, ${primeiroNome()}` : ''}.
+    A nossa vontade é que você comemore essa conquista com a sua turma. Escolha o principal motivo e conte um
+    pouco mais: é com a sua mensagem que entendemos o seu caso.</div>
 
     <div class="campo">
-      <label for="cancel-motivo">Motivo</label>
-      <select id="cancel-motivo">
-        <option value="">Escolha…</option>
-        ${MOTIVOS_CANCELAMENTO.map((m) => `<option${preenchido.motivo === m ? ' selected' : ''}>${escapar(m)}</option>`).join('')}
-      </select>
-    </div>
-    <div class="campo" id="cancel-outro" ${preenchido.motivo === 'Outros' ? '' : 'hidden'}>
-      <label for="cancel-detalhe">Qual é o motivo?</label>
-      <input id="cancel-detalhe" maxlength="300" value="${escapar(preenchido.motivoDetalhe || '')}" />
+      <label>Motivo</label>
+      <div class="chips-ajuda">${MOTIVOS_CANCELAMENTO.map((m) => `<button type="button" class="chip-ajuda${cc.motivo === m ? ' marcado' : ''}" data-motivo-cancel="${escapar(m)}">${escapar(m === 'Outros' ? 'Outro motivo' : m)}</button>`).join('')}</div>
     </div>
     <div class="campo">
-      <label for="cancel-obs">Observações <small>(opcional)</small></label>
-      <textarea id="cancel-obs" rows="5" maxlength="2000" placeholder="Algo que a equipe precise saber">${escapar(preenchido.observacoes || '')}</textarea>
+      <label for="cancel-msg">Conte o que aconteceu</label>
+      <textarea id="cancel-msg" rows="5" maxlength="2000" placeholder="Escreva com as suas palavras">${escapar(cc.mensagem)}</textarea>
+      <small class="dica" id="cancel-falta">Escreva a mensagem para continuar.</small>
     </div>
     ${erro ? `<p class="erro">${escapar(erro)}</p>` : ''}
 
     <div class="acoes dupla">
-      <button class="botao" id="cancel-enviar">Enviar pedido de cancelamento</button>
+      <button class="botao" id="cancel-continuar" disabled>Continuar</button>
       <button class="botao secundario" id="cancel-voltar">Voltar</button>
     </div>
   `, (el) => {
-    const motivo = el.querySelector('#cancel-motivo');
-    motivo.addEventListener('change', () => { el.querySelector('#cancel-outro').hidden = motivo.value !== 'Outros'; });
-    el.querySelector('#cancel-voltar').addEventListener('click', telaCancelamentoAviso);
-    el.querySelector('#cancel-enviar').addEventListener('click', async (ev) => {
-      const dados = {
-        motivo: motivo.value,
-        motivoDetalhe: el.querySelector('#cancel-detalhe').value.trim(),
-        observacoes: el.querySelector('#cancel-obs').value.trim(),
-      };
-      if (!dados.motivo) return formularioCancelamento('Escolha o motivo.', dados);
-      if (dados.motivo === 'Outros' && !dados.motivoDetalhe) return formularioCancelamento('Conte qual é o motivo.', dados);
-      ev.target.disabled = true; ev.target.textContent = 'Enviando…';
-      try {
-        const r = await chamar('/solicitacoes', {
-          method: 'POST',
-          body: JSON.stringify({ tipo: 'cancelamento', payload: { ...dados, ciente: true } }),
-        });
-        folhaPedidoEnviado({
-          titulo: 'Pedido de cancelamento <em>registrado</em>',
-          sub: 'A equipe vai entrar em contato para conferir os valores e enviar o termo de cancelamento para você assinar.',
-          protocolo: r.protocolo,
-          nota: 'Até o cancelamento ser formalizado, os seus boletos continuam valendo.',
-        });
-      } catch (err) {
-        formularioCancelamento(err.detalhe || 'Não foi possível enviar agora. Tente de novo.', dados);
-      }
+    const continuar = el.querySelector('#cancel-continuar');
+    const msg = el.querySelector('#cancel-msg');
+    const falta = el.querySelector('#cancel-falta');
+    const conferir = () => {
+      cc.mensagem = msg.value;
+      const okMsg = msg.value.trim().length >= 10;
+      continuar.disabled = !(cc.motivo && okMsg);
+      falta.textContent = !cc.motivo ? 'Escolha o motivo e escreva a mensagem para continuar.' : okMsg ? '' : 'Escreva a mensagem para continuar (pelo menos uma frase).';
+    };
+    el.querySelectorAll('[data-motivo-cancel]').forEach((b) => b.addEventListener('click', () => {
+      cc.motivo = b.dataset.motivoCancel;
+      el.querySelectorAll('[data-motivo-cancel]').forEach((x) => x.classList.toggle('marcado', x === b));
+      conferir();
+    }));
+    msg.addEventListener('input', conferir);
+    conferir();
+    el.querySelector('#cancel-voltar').addEventListener('click', telaCienciaCancelamento);
+    continuar.addEventListener('click', () => {
+      cc.mensagem = msg.value.trim();
+      if (falaDeLutoOuDoenca(cc.mensagem)) return enviarPedidoDeCancelamento({ sensivel: true });
+      if (cc.motivo === 'Insatisfação') return enviarPedidoDeCancelamento();
+      return telaRespostaDoMotivo();
     });
+  });
+}
+
+// T1, T2, T3, T5, T6 — a resposta de cada motivo (Insatisfação, T4, vai direto para a equipe).
+function telaRespostaDoMotivo() {
+  const cc = caminhoCancelamento;
+  const nome = primeiroNome();
+  const multa = multaDeHoje(cc.condicoes);
+  const lembrete = multa
+    ? `Lembrando: cancelar é quebrar o contrato e, pela cláusula 6.2, hoje a multa é de <b>${multa}</b>.`
+    : 'Lembrando: cancelar é quebrar o contrato, e a cláusula 6.2 prevê multa.';
+  const pergunta = '<b>Você quer manter a sua formatura ou seguir com o cancelamento?</b>';
+  const manterOuCancelar = [
+    { texto: 'Quero manter a minha formatura', acao: folhaFormaturaMantida, principal: true },
+    { texto: 'Quero cancelar', acao: telaContaDoCancelamento },
+  ];
+  const vencidas = typeof parcelasDoFormando === 'function' ? parcelasDoFormando((b) => b.status === 'em_atraso') : [];
+
+  const respostas = {
+    Financeiro: {
+      titulo: 'Dá para resolver <em>sem cancelar</em>',
+      texto: `<p>Imprevistos acontecem, e muitas vezes dá para resolver sem cancelar.
+        ${vencidas.length ? 'Você pode colocar tudo em dia agora pela 2ª via ou juntar as atrasadas num boleto único.' : ''}
+        Também dá para reorganizar as suas parcelas num valor mensal que caiba no seu orçamento: o contrato prevê só uma
+        taxa fixa de R$ 75 para a reprogramação ${clausula('17.3')}.</p>
+        <p>Cancelar não zera o que foi combinado: como você viu, hoje a multa é de <b>${multa || 'o percentual da cláusula 6.2'}</b>.</p>`,
+      botoes: [
+        vencidas.length ? { texto: 'Colocar em dia agora', acao: () => abrirMotivo(motivoPorId('renegociacao')), principal: true } : null,
+        { texto: 'Quero reorganizar as parcelas', acao: reorganizarAsParcelas, principal: !vencidas.length },
+        { texto: 'Mesmo assim, quero cancelar', acao: telaContaDoCancelamento },
+      ].filter(Boolean),
+    },
+    'Saiu do curso ou trocou de turma': {
+      titulo: 'A sua adesão <em>continua valendo</em>',
+      texto: `<p>Entendemos${nome ? `, ${nome}` : ''}. Mesmo com a mudança no curso, a sua adesão continua valendo, com todos os eventos e convites.</p><p>${lembrete}</p><p>${pergunta}</p>`,
+      botoes: manterOuCancelar,
+    },
+    'Mudança de cidade': {
+      titulo: 'A sua formatura <em>vai junto</em>',
+      texto: `<p>Entendemos${nome ? `, ${nome}` : ''}. Mudar de cidade não tira a sua formatura: a sua adesão continua valendo, e muitos
+        formandos voltam só para os grandes momentos, como o Baile de Gala. Os seus convites continuam garantidos para a sua família.</p>
+        <p>${lembrete}</p><p>${pergunta}</p>`,
+      botoes: manterOuCancelar,
+    },
+    'Divergências com a turma': {
+      titulo: 'A sua adesão é <em>individual</em>',
+      texto: `<p>A sua adesão é individual: o seu contrato é com a Indaiá, e não com a comissão nem com os colegas ${clausula('18.1')}.
+        Você continua com todos os seus direitos, os eventos e os convites, independentemente de qualquer divergência na turma.</p>
+        <p>${lembrete}</p><p>${pergunta}</p>`,
+      botoes: manterOuCancelar,
+    },
+    Outros: {
+      titulo: 'Obrigado por <em>contar</em>',
+      texto: `<p>Obrigado por contar${nome ? `, ${nome}` : ''}. A equipe lê a sua mensagem.</p><p>${lembrete}</p><p>${pergunta}</p>`,
+      botoes: manterOuCancelar,
+    },
+  };
+  const r = respostas[cc.motivo] || respostas.Outros;
+
+  abrirFolha(`
+    <div class="olho-ajuda">Pedido de cancelamento · ${escapar(cc.motivo)}</div>
+    <h2>${r.titulo}</h2>
+    <div class="texto-resposta">${r.texto}</div>
+    <div class="acoes-empilhadas">
+      ${r.botoes.map((b, i) => `<button class="botao${b.principal ? '' : ' secundario'}" data-resposta="${i}">${escapar(b.texto)}</button>`).join('')}
+    </div>
+    <div class="acoes"><button class="botao fantasma" id="resposta-voltar">Voltar</button></div>
+  `, (el) => {
+    el.querySelectorAll('[data-resposta]').forEach((b) => b.addEventListener('click', () => r.botoes[Number(b.dataset.resposta)].acao()));
+    el.querySelector('#resposta-voltar').addEventListener('click', () => telaMotivoCancelamento());
+  });
+}
+
+// T1: "Quero reorganizar as parcelas" vira um pedido de Negociação, com a mensagem que ele já escreveu.
+function reorganizarAsParcelas() {
+  const cc = caminhoCancelamento;
+  const ctx = cc.pedidoAberto ? { mudarDe: cc.pedidoAberto } : {};
+  formularioAjuda(motivoPorId('renegociacao'), null, ctx, { valores: {}, texto: cc.mensagem, anexos: [] });
+}
+
+// T7c — a multa em REAIS, só quando ele escolhe cancelar (decisão de 19/11/2026).
+async function telaContaDoCancelamento() {
+  abrirFolha('<div class="vazio">Calculando…</div>');
+  let r;
+  try { r = await chamar('/cancelamento/conta'); }
+  catch { r = null; }
+  const nome = primeiroNome();
+  const faixa = String(r?.faixa?.rotulo || '');
+  const faixaMinuscula = faixa ? faixa.charAt(0).toLowerCase() + faixa.slice(1) : '';
+  const texto = !r || r.multaValor == null
+    ? `<p>A data da sua festa ainda não está definida no sistema, então a equipe confirma a multa com você antes do termo.</p>`
+    : r.faixa.integral
+      ? `<p>${nome ? `${nome}, faltam` : 'Faltam'} <b>${r.diasAteFesta} dias</b> para a sua festa (${dataCurta(r.dataFesta)}). Pela cláusula 6.4, o
+        <b>valor integral da adesão (${brl(r.valorAdesao)})</b> é devido.</p>`
+      : `<p>${nome ? `${nome}, faltam` : 'Faltam'} <b>${r.diasAteFesta} dias</b> para a sua festa (${dataCurta(r.dataFesta)}). Pela cláusula 6.2 do seu
+        Termo de Adesão, quem cancela ${escapar(faixaMinuscula)} paga multa de <b>${r.faixa.pct}%</b> sobre o valor total da adesão
+        (${brl(r.valorAdesao)}). A sua multa fica em <b>${brl(r.multaValor)}</b>.</p>`;
+
+  abrirFolha(`
+    <div class="olho-ajuda">Pedido de cancelamento</div>
+    <h2>Antes de <em>confirmar</em></h2>
+    <div class="texto-resposta">
+      ${texto}
+      <p>Ao confirmar, o pedido é registrado com a data de hoje, que é a que vale para a multa. A equipe confere a conta e
+      envia o termo de cancelamento para você assinar; até lá, o contrato e os boletos continuam valendo.</p>
+    </div>
+    ${r && r.multaValor != null ? `<div class="dado"><span>Multa ${r.faixa.integral ? '(valor integral)' : `(${r.faixa.pct}%)`}</span><b class="destaque-valor">${brl(r.multaValor)}</b></div>` : ''}
+    <div class="acoes" style="flex-direction:column;gap:10px">
+      <button class="botao" id="conta-manter">Quero manter a minha formatura</button>
+      <button class="botao secundario" id="conta-confirmar">Confirmar o cancelamento</button>
+    </div>
+  `, (el) => {
+    el.querySelector('#conta-manter').addEventListener('click', folhaFormaturaMantida);
+    el.querySelector('#conta-confirmar').addEventListener('click', (ev) => {
+      ev.target.disabled = true; ev.target.textContent = 'Registrando…';
+      enviarPedidoDeCancelamento();
+    });
+  });
+}
+
+/**
+ * Registra o pedido (ou muda o assunto do pedido aberto, A10/A11) e mostra o
+ * T8 — ou o T4 (insatisfação) e o acolhimento do R2b, que não passam pela conta.
+ */
+async function enviarPedidoDeCancelamento({ sensivel = false } = {}) {
+  const cc = caminhoCancelamento;
+  const payload = { motivo: cc.motivo, observacoes: cc.mensagem, ciente: true, ...(sensivel ? { sensivel: true } : {}) };
+  abrirFolha('<div class="vazio">Registrando…</div>');
+  let r;
+  try {
+    r = cc.pedidoAberto
+      ? await chamar(`/solicitacoes/${cc.pedidoAberto.id}/assunto`, { method: 'POST', body: JSON.stringify({ tipo: 'cancelamento', payload }) })
+      : await chamar('/solicitacoes', { method: 'POST', body: JSON.stringify({ tipo: 'cancelamento', payload }) });
+  } catch (err) {
+    if (err.codigo === 'PEDIDO_ABERTO' && err.dados?.pedidoAberto) {
+      cc.pedidoAberto = err.dados.pedidoAberto;
+      return enviarPedidoDeCancelamento({ sensivel });
+    }
+    return telaMotivoCancelamento(err.detalhe || 'Não foi possível registrar agora. Tente de novo.');
+  }
+  caminhoCancelamento = null;
+  const nome = primeiroNome();
+  const nota = `${FRASE_SETE_DIAS} ${FRASE_SETE_DIAS_CANCELAMENTO}`;
+  if (sensivel) {
+    return folhaPedidoEnviado({
+      titulo: 'Sentimos <em>muito</em>',
+      sub: `${nome ? `${nome}, a` : 'A'} sua mensagem foi direto para a equipe da formatura, com prioridade. Vamos conversar com você por aqui, com todo o cuidado, antes de qualquer decisão.`,
+      protocolo: r.protocolo, pedidoId: r.id, nota,
+    });
+  }
+  if (cc.motivo === 'Insatisfação') {
+    return folhaPedidoEnviado({
+      titulo: 'A equipe vai <em>conversar</em> com você',
+      sub: `Sentimos muito que algo não tenha saído como você esperava${nome ? `, ${nome}` : ''}. A sua mensagem foi para a equipe da formatura, que vai entender o seu caso e conversar com você por aqui, antes de qualquer decisão.`,
+      protocolo: r.protocolo, pedidoId: r.id, nota,
+    });
+  }
+  return folhaPedidoEnviado({
+    titulo: 'Pedido de cancelamento <em>registrado</em>',
+    sub: `Pronto${nome ? `, ${nome}` : ''}. O seu pedido foi registrado em ${dataCurta(hoje())}, e é essa a data que vale para o contrato. A equipe confere a conta e você recebe o termo de cancelamento por e-mail para assinar. Até o termo ser assinado e o cancelamento formalizado, os boletos continuam valendo. Mudou de ideia? É só abrir o pedido em Meus pedidos e tocar em "Este assunto já foi resolvido", sem custo nenhum.`,
+    protocolo: r.protocolo, pedidoId: r.id, nota,
   });
 }
 
@@ -2633,6 +2894,14 @@ const CLASSE_PEDIDO = {
   concluida: 's-pago', atendida: 's-pago', recusada: 's-nao_gerado', cancelada: 's-nao_gerado',
 };
 const DIAS_PARA_REABRIR = 7;
+
+/** O rótulo do status, com os desfechos de 19/11/2026 (A8 arquivado, A12 concluído por você / mantido). */
+function rotuloDoStatus(s) {
+  if (s.payload?.arquivadoSemRetorno) return 'Arquivado sem retorno';
+  if (s.payload?.desfecho === 'mantido') return 'Mantido';
+  if (s.payload?.desfecho === 'resolvido_pelo_formando') return 'Concluído por você';
+  return STATUS_PEDIDO[s.status] || s.status;
+}
 const horaDoPedido = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
 async function telaMeusPedidos() {
@@ -2659,7 +2928,7 @@ async function telaMeusPedidos() {
               <strong>${escapar(s.payload?.assunto || s.rotulo || 'Pedido')}</strong>
               <span>${escapar(s.ultimaMensagem ? `${s.ultimaMensagem.autor === 'equipe' ? 'Equipe: ' : 'Você: '}${s.ultimaMensagem.texto}` : s.payload?.mensagem || '')}</span>
               <br><span class="protocolo">${escapar(s.protocolo || '')}</span>
-              <span class="marca-status ${CLASSE_PEDIDO[s.status] || 's-em_aberto'}">${escapar(STATUS_PEDIDO[s.status] || s.status)}</span>
+              <span class="marca-status ${CLASSE_PEDIDO[s.status] || 's-em_aberto'}">${escapar(rotuloDoStatus(s))}</span>
             </div>
             <div class="quanto"><b>${dataCurta(s.criadoEm.slice(0, 10))}</b><span class="seta">›</span></div>
           </button>`).join('')}
@@ -2700,9 +2969,11 @@ async function telaPedido(id, erro, rascunho = null) {
   const quando = s.resolvidoEm || s.criadoEm;
   const podeReabrir = encerrado && s.status !== 'cancelada' && Date.now() - new Date(quando).getTime() < DIAS_PARA_REABRIR * 86400000;
   const podeResponder = !encerrado || podeReabrir;
-  // A9 (13/11/2026): o formando cancela o próprio pedido aberto. O pedido de cancelamento da adesão
-  // não tem o botão — desistir dele é conversa com a equipe.
-  const podeDesistir = !encerrado && s.tipo !== 'cancelamento';
+  // A11/A12 (19/11/2026): no pedido aberto, "Mudar de assunto" e "Este assunto já foi resolvido".
+  // O de cancelamento não muda de assunto: "já foi resolvido" nele é desistir de cancelar (mantido).
+  const ehCancelamento = s.tipo === 'cancelamento';
+  // D11: a equipe pediu os dados bancários da devolução e ele ainda não mandou.
+  const pedeDadosBancarios = !encerrado && ehCancelamento && s.payload?.dadosBancarios?.pedido && !s.payload.dadosBancarios.preenchido;
   const campos = s.payload?.campos || [];
 
   const bolha = (m, i) => `
@@ -2717,33 +2988,52 @@ async function telaPedido(id, erro, rascunho = null) {
   abrirFolha(`
     <div class="olho-ajuda">${escapar(s.protocolo)} · aberto em ${dataCurta(s.criadoEm.slice(0, 10))}</div>
     <h2>${escapar(s.payload?.assunto || s.rotulo || 'Pedido')}</h2>
-    <span class="marca-status ${CLASSE_PEDIDO[s.status] || 's-em_aberto'}">${escapar(STATUS_PEDIDO[s.status] || s.status)}</span>
+    <span class="marca-status ${CLASSE_PEDIDO[s.status] || 's-em_aberto'}">${escapar(rotuloDoStatus(s))}</span>
 
-    ${s.status === 'aguardando_formando' ? '<div class="faixa alerta" style="margin-top:12px"><div><b>A equipe precisa de você.</b> Responda abaixo para o pedido continuar.</div></div>' : ''}
+    ${pedeDadosBancarios
+      ? '<div class="faixa alerta" style="margin-top:12px"><div><b>Falta enviar os seus dados bancários.</b> Preencha o formulário "Dados para a devolução", logo abaixo da conversa, e toque em Enviar.</div><button class="botao" id="ir-dados-bancarios" style="margin-top:8px">Preencher os dados</button></div>'
+      : s.status === 'aguardando_formando' ? '<div class="faixa alerta" style="margin-top:12px"><div><b>A equipe precisa de você.</b> Responda abaixo para o pedido continuar.</div></div>' : ''}
 
     <div class="conversa">
       ${(s.mensagens || []).map(bolha).join('')}
       ${!encerrado && (s.mensagens || []).slice(-1)[0]?.autor === 'formando'
         ? '<div class="conversa-nota">A equipe já recebeu. A resposta chega aqui e por e-mail.</div>' : ''}
-      ${encerrado ? `<div class="conversa-nota">${s.status === 'recusada' ? 'Pedido não aprovado' : s.status === 'cancelada' ? 'Pedido cancelado' : 'Pedido resolvido'} em ${dataCurta(String(quando).slice(0, 10))}.</div>` : ''}
+      ${encerrado ? `<div class="conversa-nota">${s.payload?.arquivadoSemRetorno ? 'Solicitação encerrada e arquivada sem retorno' : s.payload?.desfecho === 'mantido' ? 'Você manteve a sua formatura' : s.status === 'recusada' ? 'Pedido não aprovado' : s.status === 'cancelada' ? 'Pedido cancelado' : 'Pedido resolvido'} em ${dataCurta(String(quando).slice(0, 10))}.</div>` : ''}
     </div>
+
+    ${pedeDadosBancarios ? `
+      <div class="cartao" id="dados-bancarios" style="margin-top:14px">
+        <div class="secao-titulo" style="margin-top:0">Dados para a devolução</div>
+        <div class="campo"><label for="db-titular">Nome completo do titular</label><input id="db-titular" maxlength="255" autocomplete="name" /></div>
+        <div class="campo"><label for="db-cpf">CPF do titular</label><input id="db-cpf" maxlength="14" inputmode="numeric" /></div>
+        <div class="campo"><label for="db-banco">Banco</label><input id="db-banco" maxlength="80" /></div>
+        <div class="campo"><label for="db-agencia">Agência</label><input id="db-agencia" maxlength="20" inputmode="numeric" /></div>
+        <div class="campo"><label for="db-conta">Conta com o dígito</label><input id="db-conta" maxlength="30" /></div>
+        <div class="campo"><label for="db-tipo">Tipo da chave PIX</label>
+          <select id="db-tipo"><option value="">Escolha…</option><option value="cpf">CPF</option><option value="cnpj">CNPJ</option><option value="email">E-mail</option><option value="celular">Celular</option><option value="aleatoria">Chave aleatória</option></select></div>
+        <div class="campo"><label for="db-chave">Chave PIX</label><input id="db-chave" maxlength="140" /></div>
+        <p class="erro" id="db-erro" hidden></p>
+        <p class="rodape-nota">Os dados entram no termo de cancelamento e são usados só para a devolução.</p>
+      </div>` : ''}
 
     ${podeResponder ? `
       <div class="responder-pedido">
         ${encerrado ? '<div class="dica">Não resolveu? Responda e o pedido volta para a equipe.</div>' : ''}
         <div class="campo">
-          <label for="resposta-texto">Sua resposta</label>
+          <label for="resposta-texto">${pedeDadosBancarios ? 'Quer escrever algo para a equipe? (opcional)' : 'Sua resposta'}</label>
           <textarea id="resposta-texto" rows="3" maxlength="4000" placeholder="Escreva aqui">${escapar(f.texto)}</textarea>
         </div>
         ${blocoDeAnexos('Anexos', '', false)}
         ${erro ? `<p class="erro">${escapar(erro)}</p>` : ''}
-        <div class="acoes"><button class="botao" id="enviar-resposta">${encerrado ? 'Reabrir e enviar' : 'Enviar resposta'}</button></div>
+        <div class="acoes"><button class="botao" id="enviar-resposta">${pedeDadosBancarios ? 'Enviar' : encerrado ? 'Reabrir e enviar' : 'Enviar resposta'}</button></div>
       </div>` : encerrado ? '<p class="rodape-nota">Precisa de ajuda com outra coisa? Abra um novo pedido.</p>' : ''}
 
-    ${podeDesistir ? `
-      <div class="desistir-pedido" id="desistir-caixa">
-        <button class="botao fantasma" id="desistir">Não preciso mais deste pedido</button>
-      </div>` : ''}
+    ${!encerrado ? `
+      <div class="desistir-pedido" id="resolvido-caixa">
+        ${ehCancelamento ? '' : '<button class="botao secundario" id="mudar-assunto">Mudar de assunto</button>'}
+        <button class="botao fantasma" id="ja-resolvido">Este assunto já foi resolvido</button>
+      </div>
+      <p class="rodape-nota">${FRASE_SETE_DIAS}${ehCancelamento ? ` ${FRASE_SETE_DIAS_CANCELAMENTO}` : ''}</p>` : ''}
 
     <div class="acoes"><button class="botao fantasma" id="voltar-pedidos">Voltar para Meus pedidos</button></div>
   `, (el) => {
@@ -2751,13 +3041,42 @@ async function telaPedido(id, erro, rascunho = null) {
     el.querySelectorAll('[data-anexo]').forEach((b) => b.addEventListener('click', () => abrirAnexoDoPedido(s.id, b.dataset.anexo)));
     const conversa = el.querySelector('.conversa');
     conversa?.lastElementChild?.scrollIntoView({ block: 'nearest' });
-    if (podeDesistir) ligarDesistencia(el, s);
+    if (!encerrado) ligarAssuntoResolvido(el, s);
+    if (pedeDadosBancarios) {
+      // D11: o formulário fica abaixo da conversa; a Aline (teste de 23/11) não o viu e respondeu
+      // pela caixa de mensagem. O botão do aviso leva direto a ele.
+      const form = el.querySelector('#dados-bancarios');
+      el.querySelector('#ir-dados-bancarios')?.addEventListener('click', () => {
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.querySelector('#db-titular')?.focus({ preventScroll: true });
+      });
+    }
     if (!podeResponder) return;
     el.querySelector('#resposta-texto').addEventListener('input', (e) => { f.texto = e.target.value; });
     ligarAnexos(el, f.anexos);
     el.querySelector('#enviar-resposta').addEventListener('click', async (e) => {
       f.texto = el.querySelector('#resposta-texto').value.trim();
-      if (f.texto.length < 2 && !f.anexos.length) return telaPedido(id, 'Escreva a resposta ou anexe um arquivo.', f);
+      const temMensagem = f.texto.length >= 2 || f.anexos.length > 0;
+      // D11 (23/11/2026, pedido da Dani): um botão só. Com o formulário dos dados bancários na
+      // tela, "Enviar" manda os dados e, se ele escreveu algo, a mensagem junto.
+      if (pedeDadosBancarios) {
+        const r = lerDadosBancarios(el);
+        if (r.vazio && !temMensagem) return r.mostrarErro('Preencha os dados para a devolução.');
+        if (!r.vazio) {
+          if (r.faltando) return r.mostrarErro(`Preencha ${r.faltando}.`);
+          e.target.disabled = true; e.target.textContent = 'Enviando…';
+          try {
+            await chamar(`/solicitacoes/${id}/dados-bancarios`, { method: 'POST', body: JSON.stringify(r.dados) });
+          } catch (err) {
+            e.target.disabled = false; e.target.textContent = 'Enviar';
+            return r.mostrarErro(err.detalhe || 'Não foi possível enviar agora. Tente de novo.');
+          }
+          if (!temMensagem) {
+            avisar('Dados enviados para a equipe');
+            return telaPedido(id);
+          }
+        }
+      } else if (!temMensagem) return telaPedido(id, 'Escreva a resposta ou anexe um arquivo.', f);
       e.target.disabled = true; e.target.textContent = 'Enviando…';
       try {
         await chamar(`/solicitacoes/${id}/mensagens`, {
@@ -2775,29 +3094,71 @@ async function telaPedido(id, erro, rascunho = null) {
   });
 }
 
-// "Não preciso mais": pede confirmação na própria tela (sem janela do navegador) e cancela.
-function ligarDesistencia(el, s) {
-  const caixa = el.querySelector('#desistir-caixa');
-  el.querySelector('#desistir').addEventListener('click', () => {
-    caixa.innerHTML = `
-      <div class="faixa alerta"><div><b>Cancelar o pedido ${escapar(s.protocolo)}?</b>
-        Ele sai da fila da equipe e não pode ser reaberto. Se precisar de novo, é só abrir outro pedido.</div></div>
-      <div class="acoes dupla">
-        <button class="botao" id="desistir-sim">Sim, cancelar</button>
-        <button class="botao fantasma" id="desistir-nao">Voltar</button>
-      </div>`;
-    caixa.querySelector('#desistir-nao').addEventListener('click', () => telaPedido(s.id));
-    caixa.querySelector('#desistir-sim').addEventListener('click', async (e) => {
-      e.target.disabled = true; e.target.textContent = 'Cancelando…';
+/**
+ * A12 (decisão de 19/11/2026): "Este assunto já foi resolvido" → "Ficou mais alguma coisa?"
+ * com Concluir tudo / Mudar de assunto. No pedido de cancelamento, é desistir de cancelar:
+ * fica MANTIDO, sem custo. A pergunta aparece na própria tela, sem janela do navegador.
+ */
+function ligarAssuntoResolvido(el, s) {
+  const caixa = el.querySelector('#resolvido-caixa');
+  const ehCancelamento = s.tipo === 'cancelamento';
+  const aberto = { id: s.id, protocolo: s.protocolo, tipo: s.tipo, assunto: s.payload?.assunto || s.rotulo || 'Pedido' };
+  el.querySelector('#mudar-assunto')?.addEventListener('click', () => telaAjuda({ mudarDe: aberto }));
+  el.querySelector('#ja-resolvido').addEventListener('click', () => {
+    caixa.innerHTML = ehCancelamento
+      ? `<div class="faixa"><div><b>Quer manter a sua formatura e desistir do cancelamento?</b> Sem custo nenhum: o pedido é encerrado e tudo continua como estava.</div></div>
+        <div class="acoes dupla">
+          <button class="botao" id="concluir-tudo">Sim, quero manter a minha formatura</button>
+          <button class="botao fantasma" id="resolvido-voltar">Voltar</button>
+        </div>`
+      : `<div class="faixa"><div><b>Ficou mais alguma coisa?</b></div></div>
+        <div class="acoes dupla">
+          <button class="botao" id="concluir-tudo">Concluir tudo</button>
+          <button class="botao secundario" id="mudar-assunto-2">Mudar de assunto</button>
+        </div>
+        <div class="acoes"><button class="botao fantasma" id="resolvido-voltar">Voltar</button></div>`;
+    caixa.querySelector('#resolvido-voltar').addEventListener('click', () => telaPedido(s.id));
+    caixa.querySelector('#mudar-assunto-2')?.addEventListener('click', () => telaAjuda({ mudarDe: aberto }));
+    caixa.querySelector('#concluir-tudo').addEventListener('click', async (e) => {
+      e.target.disabled = true; e.target.textContent = 'Concluindo…';
       try {
-        await chamar(`/solicitacoes/${s.id}/cancelar`, { method: 'POST', body: '{}' });
-        avisar('Pedido cancelado');
+        await chamar(`/solicitacoes/${s.id}/concluir`, { method: 'POST', body: '{}' });
+        if (ehCancelamento) return folhaFormaturaMantida();
+        avisar('Pedido concluído');
         telaPedido(s.id);
       } catch (err) {
-        telaPedido(s.id, err.message === 'pedido_encerrado' ? 'Este pedido já foi encerrado.' : 'Não foi possível cancelar agora. Tente de novo.');
+        telaPedido(s.id, err.detalhe || (err.message === 'pedido_encerrado' ? 'Este pedido já foi encerrado.' : 'Não foi possível concluir agora. Tente de novo.'));
       }
     });
   });
+}
+
+/**
+ * D11 (decisão de 19/11/2026): lê o formulário dos dados bancários da devolução. Quem envia é
+ * o botão "Enviar" da resposta (um botão só, 23/11). O erro aparece em destaque no formulário:
+ * no teste de 23/11 a recusa (CPF inválido) passou despercebida.
+ */
+function lerDadosBancarios(el) {
+  const campo = (id) => el.querySelector(`#db-${id}`);
+  const erro = campo('erro');
+  const dados = {
+    titular: campo('titular').value.trim(),
+    cpf: campo('cpf').value.trim(),
+    banco: campo('banco').value.trim(),
+    agencia: campo('agencia').value.trim(),
+    conta: campo('conta').value.trim(),
+    tipoChave: campo('tipo').value,
+    chave: campo('chave').value.trim(),
+  };
+  const faltando = [['titular', 'o nome do titular'], ['cpf', 'o CPF'], ['banco', 'o banco'], ['agencia', 'a agência'], ['conta', 'a conta'], ['tipoChave', 'o tipo da chave PIX'], ['chave', 'a chave PIX']]
+    .find(([k]) => !dados[k])?.[1] ?? null;
+  const mostrarErro = (frase) => {
+    erro.hidden = false;
+    erro.textContent = frase;
+    erro.className = 'faixa alerta';
+    erro.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+  return { dados, faltando, vazio: Object.values(dados).every((v) => !v), mostrarErro };
 }
 
 // ---------- 2ª via de parcela vencida ----------------------------------------
@@ -4910,7 +5271,7 @@ function folhaPedidoEnviado({ titulo, sub, protocolo, nota, pedidoId }) {
       <button class="botao" data-fechar-folha>Entendi</button>
       ${pedidoId ? '<button class="botao secundario" id="ver-pedido">Ver o pedido</button>' : ''}
     </div>
-    ${nota ? `<p class="rodape-nota">${nota}</p>` : ''}
+    <p class="rodape-nota">${nota ? `${nota}${nota.includes(FRASE_SETE_DIAS) ? '' : ` ${FRASE_SETE_DIAS}`}` : FRASE_SETE_DIAS}</p>
   `, (el) => {
     el.querySelector('#ver-pedido')?.addEventListener('click', () => telaPedido(pedidoId));
     prepararFaixaDosAvisos(el);
